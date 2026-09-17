@@ -100,6 +100,22 @@ export default async function OpportunitiesPage({
           ))}
         </div>
       )}
+
+      <section className="mt-10">
+        <h2 className="text-2xl font-semibold">Opportunity map</h2>
+        <iframe
+          src="https://app.mapline.com/map/map_74372625/L1FtdVltMGxYVU81SlRQMUxsZEZDaXZpTFlXdkFjUUlvMGNLd1"
+          title="Volunteer opportunity map"
+          className="mt-4 w-full border-0"
+          style={{ height: "500px" }}
+          allow="geolocation *"
+        />
+        <div className="mt-1 text-[10px]">
+          <a href="https://mapline.com" target="_blank" rel="noreferrer">
+            Mapping by Mapline
+          </a>
+        </div>
+      </section>
     </section>
   );
 }

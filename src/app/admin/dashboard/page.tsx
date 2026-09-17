@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
 import { createClient } from "@/lib/supabase/server";
 import { AdminPlatformSummary } from "@/lib/types";
+import { SendTestEmailButton } from "@/components/SendTestEmailButton";
 
 type AdminSummaryRow = AdminPlatformSummary | null;
 
@@ -79,6 +80,8 @@ async function AdminDashboardContent() {
           description="Review volunteer booking activity."
         />
       </div>
+
+      <SendTestEmailButton />
     </section>
   );
 }

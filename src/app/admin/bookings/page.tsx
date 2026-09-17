@@ -1,4 +1,6 @@
 import { RoleGate } from "@/components/RoleGate";
+import { AttendanceRecorder } from "@/components/AttendanceRecorder";
+import { ManualHoursRecorder } from "@/components/ManualHoursRecorder";
 import { createClient } from "@/lib/supabase/server";
 import { Booking, Opportunity, Organization, Profile } from "@/lib/types";
 
@@ -8,10 +10,12 @@ type AdminBookingRow = Booking & {
     | (Pick<
         Opportunity,
         "title" | "start_at" | "city" | "state" | "location_name"
+          | "id"
       > & {
         organizations: Pick<Organization, "name"> | null;
       })
     | null;
+  attendance_logs: { status: string; recorded_at: string }[];
 };
 
 export default async function AdminBookingsPage() {
@@ -41,6 +45,10 @@ async function AdminBookingsContent() {
         city,
         state,
         location_name,
+        attendance_logs (
+          status,
+          recorded_at
+        ),
         organizations (
           name
         )
@@ -74,6 +82,7 @@ async function AdminBookingsContent() {
               <th className="py-3 pr-4">Location</th>
               <th className="py-3 pr-4">Status</th>
               <th className="py-3 pr-4">Booked</th>
+              <th className="py-3 pr-4">Attendance</th>
             </tr>
           </thead>
 
@@ -121,6 +130,19 @@ async function AdminBookingsContent() {
 
                   <td className="py-3 pr-4">
                     {new Date(booking.booked_at).toLocaleDateString()}
+                  </td>
+
+                  <td className="py-3 pr-4">
+                    <AttendanceRecorder
+                      bookingId={booking.id}
+                      initialStatus={booking.attendance_logs?.[0]?.status}
+                    />
+                    {opportunity && (
+                      <ManualHoursRecorder
+                        volunteerId={booking.volunteer_id}
+                        opportunityId={opportunity.id}
+                      />
+                    )}
                   </td>
                 </tr>
               );

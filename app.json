@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "GIVE",
+    "slug": "give",
+    "plugins": [
+      "expo-router",
+      "expo-notifications"
+    ]
+  }
+}

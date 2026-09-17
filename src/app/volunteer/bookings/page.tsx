@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { cancelBooking } from "@/lib/actions/bookings";
 import { createClient } from "@/lib/supabase/server";
 import { BookingWithOpportunity } from "@/lib/types";
+import { AttendanceControls } from "@/components/AttendanceControls";
 
 type VolunteerBookingsPageProps = {
   searchParams: Promise<{
@@ -55,6 +56,19 @@ async function VolunteerBookingsContent({
     .order("booked_at", { ascending: false });
 
   const bookings = (data || []) as BookingWithOpportunity[];
+  const { data: scheduleNotifications } = await supabase
+    .from("notifications")
+    .select("opportunity_id")
+    .eq("recipient_id", user!.id)
+    .eq("type", "schedule_updated")
+    .eq("status", "sent")
+    .is("read_at", null)
+    .is("archived_at", null);
+  const changedOpportunityIds = new Set(
+    (scheduleNotifications ?? [])
+      .map((notification) => notification.opportunity_id)
+      .filter(Boolean)
+  );
 
   return (
     <section>
@@ -67,6 +81,17 @@ async function VolunteerBookingsContent({
 
       {message && <p className="alert-info mb-4">{message}</p>}
       {error && <p className="alert-error mb-4">{error}</p>}
+      {changedOpportunityIds.size > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <p className="font-semibold">Schedule change</p>
+          <p className="mt-1 text-sm">
+            One or more of your bookings has a new date or time. Review the highlighted booking below.
+          </p>
+          <Link href="/notifications" className="mt-2 inline-flex text-sm font-semibold underline">
+            View notification
+          </Link>
+        </div>
+      )}
 
       {bookings.length === 0 ? (
         <div className="rounded-xl bg-white p-6 shadow-sm">
@@ -85,14 +110,24 @@ async function VolunteerBookingsContent({
           {bookings.map((booking) => {
             const opportunity = booking.opportunities;
             const startDate = new Date(opportunity.start_at);
+            const scheduleChanged = changedOpportunityIds.has(opportunity.id);
 
             return (
               <article
                 key={booking.id}
-                className="rounded-xl bg-white p-5 shadow-sm"
+                className={`rounded-xl border bg-white p-5 shadow-sm ${
+                  scheduleChanged
+                    ? "border-amber-400 ring-2 ring-amber-100"
+                    : "border-transparent"
+                }`}
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
+                    {scheduleChanged && (
+                      <span className="mb-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+                        Schedule changed
+                      </span>
+                    )}
                     <p className="text-sm font-medium text-emerald-700">
                       {opportunity.organizations?.name}
                     </p>
@@ -130,6 +165,7 @@ async function VolunteerBookingsContent({
                     </SubmitButton>
                   </form>
                 </div>
+                <AttendanceControls bookingId={booking.id} />
               </article>
             );
           })}
