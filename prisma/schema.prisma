@@ -155,6 +155,7 @@ model AttendanceLog {
 model Profile {
   id                                                     String               @id @default(uuid()) @db.Uuid
   role                                                   user_role            @default(volunteer)
+  email                                                  String?              @map("Email")
   firstName                                              String?              @map("first_name")
   lastName                                               String?              @map("last_name")
   displayName                                            String?              @map("display_name")

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
+import { prisma } from "@/lib/prisma";
 
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") || "").trim();
@@ -43,11 +44,12 @@ export async function signUp(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
+        Email: email,
         first_name: firstName,
         last_name: lastName,
         display_name: `${firstName} ${lastName}`.trim() || email,
@@ -59,6 +61,13 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     redirect(`/register?error=${encodeURIComponent(error.message)}`);
+  }
+
+  if (data.user?.email) {
+    await prisma.profile.updateMany({
+      where: { id: data.user.id },
+      data: { email: data.user.email },
+    });
   }
 
   redirect("/login?message=Account created. Please log in.");

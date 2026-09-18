@@ -8,7 +8,14 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (data.user?.email) {
+      await prisma.profile.updateMany({
+        where: { id: data.user.id },
+        data: { email: data.user.email },
+      });
+    }
   }
 
   return NextResponse.redirect(new URL("/volunteer/dashboard", request.url));
