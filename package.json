@@ -5,8 +5,8 @@
   "scripts": {
     "native:sync": "node scripts/ensure-native-bindings.mjs",
     "predev": "npm run native:sync",
-    "dev": "next dev",
-    "prebuild": "npm run native:sync",
+    "dev": "next dev --webpack",
+    "prebuild": "npm run native:sync && npm run prisma:generate",
     "build": "next build",
     "prestart": "npm run native:sync",
     "start": "next start",
@@ -19,10 +19,15 @@
     "@supabase/ssr": "^0.12.1",
     "@supabase/supabase-js": "^2.110.3",
     "@types/pg": "^8.21.0",
+    "expo": "^57.0.15",
+    "expo-constants": "~57.0.13",
+    "expo-notifications": "~57.0.13",
     "next": "16.2.10",
+    "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "resend": "^6.22.0"
   },
   "devDependencies": {
     "@prisma/client": "^7.9.1",
@@ -40,6 +45,10 @@
   "allowScripts": {
     "prisma@7.9.1": true,
     "@prisma/engines@7.9.1": true,
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver@1.12.2": true,
+    "sharp@0.34.5": true
+  },
+  "overrides": {
+    "uuid": "^11.1.0"
   }
 }

@@ -13,7 +13,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Example query: count users
-  const userCount = await prisma.user.count();
+  const userCount = await prisma.users.count();
   console.log(`✅ Total users: ${userCount}`);
 }
 

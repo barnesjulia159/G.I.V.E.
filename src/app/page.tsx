@@ -15,6 +15,7 @@ export default function HomePage() {
             src="/images/logo2.png"
             width={300}
             height={300}
+            style={{ width: "300px", height: "auto" }}
             alt="logo"
         />
         </p>

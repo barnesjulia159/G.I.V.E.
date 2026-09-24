@@ -251,7 +251,7 @@ async function EditOpportunityContent({
         <div className="flex flex-wrap gap-3">
           <SubmitButton
             name="submit_action"
-            value="draft"
+          value="draft"
             className="bg-slate-700 hover:bg-slate-800"
           >
             Save Draft

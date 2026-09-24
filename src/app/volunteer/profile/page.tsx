@@ -98,7 +98,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const fullName =
     [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
-    profile.displayName;
+    profile.displayName ||
+    "Profile";
 
   const location = [
     profile.city,

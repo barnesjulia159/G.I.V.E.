@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export async function AppHeader() {
   const supabase = await createClient();
@@ -33,6 +34,10 @@ export async function AppHeader() {
             Opportunities
           </Link>
 
+          {user && (
+            <NotificationBell />
+          )}
+
           {role === "volunteer" && (
             <>
               <Link href="/volunteer/dashboard" className="text-slate-700 hover:text-emerald-700">
@@ -40,6 +45,9 @@ export async function AppHeader() {
               </Link>
               <Link href="/volunteer/bookings" className="text-slate-700 hover:text-emerald-700">
                 My Bookings
+              </Link>
+              <Link href="/volunteer/hours" className="text-slate-700 hover:text-emerald-700">
+                Hours
               </Link>
             </>
           )}
