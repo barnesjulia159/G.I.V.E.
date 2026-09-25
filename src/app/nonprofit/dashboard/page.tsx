@@ -130,17 +130,22 @@ async function NonprofitDashboardContent({
             You have not created any opportunities yet.
           </p>
         ) : (
-          <div className="mt-5 overflow-x-auto">
+          <div
+            className="table-scroll mt-5"
+            role="region"
+            aria-label="Your opportunities table"
+            tabIndex={0}
+          >
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b text-slate-600">
-                  <th className="py-3 pr-4">Title</th>
-                  <th className="py-3 pr-4">Date</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3 pr-4">Max capacity</th>
-                  <th className="py-3 pr-4">Sign-ups</th>
-                  <th className="py-3 pr-4">Checked-in</th>
-                  <th className="py-3 pr-4">Actions</th>
+                  <th scope="col" className="py-3 pr-4">Title</th>
+                  <th scope="col" className="py-3 pr-4">Date</th>
+                  <th scope="col" className="py-3 pr-4">Status</th>
+                  <th scope="col" className="py-3 pr-4">Max capacity</th>
+                  <th scope="col" className="py-3 pr-4">Sign-ups</th>
+                  <th scope="col" className="py-3 pr-4">Checked-in</th>
+                  <th scope="col" className="py-3 pr-4">Actions</th>
                 </tr>
               </thead>
 

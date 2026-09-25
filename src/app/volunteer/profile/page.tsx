@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +10,7 @@ import {
 } from "@/lib/actions/profiles";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 import { SubmitButton } from "@/components/SubmitButton";
+import { VolunteerSkillsAndCausesEditor } from "@/components/VolunteerSkillsAndCausesEditor";
 
 type DayAvailability = { am: boolean; pm: boolean };
 type WeekAvailability = Record<(typeof AVAILABILITY_DAYS)[number], DayAvailability>;
@@ -202,12 +202,18 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
             <ProfileSection title="Availability">
               <form action={updateVolunteerAvailability} className="space-y-4">
-                <table className="w-full text-left text-sm">
+                <div
+                  className="table-scroll"
+                  role="region"
+                  aria-label="Weekly availability schedule"
+                  tabIndex={0}
+                >
+                <table className="w-full text-left text-sm" aria-label="Availability by day and time">
                   <thead>
                     <tr>
-                      <th className="pb-2 font-semibold text-slate-600">Day</th>
-                      <th className="pb-2 font-semibold text-slate-600">AM</th>
-                      <th className="pb-2 font-semibold text-slate-600">PM</th>
+                      <th scope="col" className="pb-2 font-semibold text-slate-600">Day</th>
+                      <th scope="col" className="pb-2 font-semibold text-slate-600">AM</th>
+                      <th scope="col" className="pb-2 font-semibold text-slate-600">PM</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -218,6 +224,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                           <input
                             type="checkbox"
                             name={`${day}_am`}
+                            aria-label={`${day} morning availability`}
                             defaultChecked={availability[day].am}
                             className="size-4"
                           />
@@ -226,6 +233,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                           <input
                             type="checkbox"
                             name={`${day}_pm`}
+                            aria-label={`${day} afternoon availability`}
                             defaultChecked={availability[day].pm}
                             className="size-4"
                           />
@@ -234,40 +242,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     ))}
                   </tbody>
                 </table>
+                </div>
 
                 <SubmitButton>Save availability</SubmitButton>
               </form>
             </ProfileSection>
 
             <ProfileSection title="Skills & Causes">
-              <div className="leading-7 text-slate-700">
-                <Link
-                href="/volunteer/profile/skills-causes"
-                className="w-fit rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-              >
-                Skills &amp; causes
-              </Link>
-              {profile.skillsAndCauses ? (
-                <>
-                  <ul className="mt-2 list-disc pl-5">
-                    {JSON.parse(profile.skillsAndCauses ?? "").skills.map(
-                      (skill: string) => (
-                        <li key={skill}>{skill}</li>
-                      )
-                    )}
-                  </ul>
-                  <ul className="mt-2 list-disc pl-5">
-                    {JSON.parse(profile.skillsAndCauses ?? "").causes.map(
-                      (cause: string) => (
-                        <li key={cause}>{cause}</li>
-                      )
-                    )}
-                  </ul>
-                </>
-              ) : (
-                <p className="mt-2 text-slate-500">No skills and causes have been added.</p>
-              )}
-              </div>
+              <VolunteerSkillsAndCausesEditor />
             </ProfileSection>
           </div>
 

@@ -39,64 +39,73 @@ export async function AppHeader() {
           </span>
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-4">
-          <Link href="/opportunities" className={navLinkClass}>
-            Opportunities
-          </Link>
+        <details className="site-menu">
+          <summary className="site-menu-toggle">
+            <span className="site-menu-icon" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span>Menu</span>
+          </summary>
 
-          {user && (
-            <NotificationBell />
-          )}
-
-          {role === "volunteer" && (
-            <>
-              <Link href="/volunteer/dashboard" className={navLinkClass}>
-                Volunteer Dashboard
-              </Link>
-              <Link href="/volunteer/bookings" className={navLinkClass}>
-                My Bookings
-              </Link>
-              <Link href="/volunteer/hours" className={navLinkClass}>
-                Hours
-              </Link>
-            </>
-          )}
-
-          {role === "nonprofit" && (
-            <>
-              <Link href="/nonprofit/dashboard" className={navLinkClass}>
-                Nonprofit Dashboard
-              </Link>
-              <Link href="/nonprofit/opportunities/new" className={navLinkClass}>
-                Post Opportunity
-              </Link>
-            </>
-          )}
-
-          {role === "admin" && (
-            <Link href="/admin/dashboard" className={navLinkClass}>
-              Admin
+          <nav aria-label="Main navigation" className="site-nav">
+            <Link href="/opportunities" className={navLinkClass}>
+              Opportunities
             </Link>
-          )}
 
-          {!user ? (
-            <>
-              <Link href="/login" className={navLinkClass}>
-                Login
+            {user && <NotificationBell />}
+
+            {role === "volunteer" && (
+              <>
+                <Link href="/volunteer/dashboard" className={navLinkClass}>
+                  Volunteer Dashboard
+                </Link>
+                <Link href="/volunteer/bookings" className={navLinkClass}>
+                  My Bookings
+                </Link>
+                <Link href="/volunteer/hours" className={navLinkClass}>
+                  Hours
+                </Link>
+              </>
+            )}
+
+            {role === "nonprofit" && (
+              <>
+                <Link href="/nonprofit/dashboard" className={navLinkClass}>
+                  Nonprofit Dashboard
+                </Link>
+                <Link href="/nonprofit/opportunities/new" className={navLinkClass}>
+                  Post Opportunity
+                </Link>
+              </>
+            )}
+
+            {role === "admin" && (
+              <Link href="/admin/dashboard" className={navLinkClass}>
+                Admin
               </Link>
-              <Link
-                href="/register"
-                className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-900"
-              >
-                Register
-              </Link>
-            </>
-          ) : (
-            <form action={signOut}>
-              <button className={navLinkClass}>Sign Out</button>
-            </form>
-          )}
-        </nav>
+            )}
+
+            {!user ? (
+              <>
+                <Link href="/login" className={navLinkClass}>
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-900"
+                >
+                  Register
+                </Link>
+              </>
+            ) : (
+              <form action={signOut}>
+                <button type="submit" className={navLinkClass}>Sign Out</button>
+              </form>
+            )}
+          </nav>
+        </details>
       </div>
     </header>
   );

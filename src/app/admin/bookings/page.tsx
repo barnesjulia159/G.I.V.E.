@@ -71,18 +71,23 @@ async function AdminBookingsContent() {
 
       {error && <p className="alert-error mb-4">{error.message}</p>}
 
-      <div className="overflow-x-auto rounded-xl bg-white p-6 shadow-sm">
+      <div
+        className="table-scroll rounded-xl bg-white p-6 shadow-sm"
+        role="region"
+        aria-label="Bookings table"
+        tabIndex={0}
+      >
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-slate-600">
-              <th className="py-3 pr-4">Volunteer</th>
-              <th className="py-3 pr-4">Opportunity</th>
-              <th className="py-3 pr-4">Organization</th>
-              <th className="py-3 pr-4">Date</th>
-              <th className="py-3 pr-4">Location</th>
-              <th className="py-3 pr-4">Status</th>
-              <th className="py-3 pr-4">Booked</th>
-              <th className="py-3 pr-4">Attendance</th>
+              <th scope="col" className="py-3 pr-4">Volunteer</th>
+              <th scope="col" className="py-3 pr-4">Opportunity</th>
+              <th scope="col" className="py-3 pr-4">Organization</th>
+              <th scope="col" className="py-3 pr-4">Date</th>
+              <th scope="col" className="py-3 pr-4">Location</th>
+              <th scope="col" className="py-3 pr-4">Status</th>
+              <th scope="col" className="py-3 pr-4">Booked</th>
+              <th scope="col" className="py-3 pr-4">Attendance</th>
             </tr>
           </thead>
 

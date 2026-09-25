@@ -3,70 +3,66 @@ import Image from "next/image";
 
 export default function HomePage() {
   return (
-    <section className="grid gap-10 md:grid-cols-[1.15fr_0.85fr] md:items-center">
-      <div className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm md:p-10">
-        <div className="mb-6 flex items-center gap-4">
+    <div className="home-page">
+      <section className="home-intro">
+        <div className="home-brand">
           <Image
             src="/images/logo2.png"
-            width={88}
-            height={88}
-            className="rounded-2xl border border-slate-200 bg-white object-contain p-2"
-            alt="GIVE logo"
+            width={112}
+            height={112}
+            className="home-logo"
+            alt="GIVE"
+            priority
           />
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-teal-800">
-            Get Involved. Volunteer Easily.
-          </p>
+          <p className="home-eyebrow">GET INVOLVED. VOLUNTEER EASILY.</p>
         </div>
 
-        <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
-          Find meaningful ways to serve your community.
-        </h1>
-
-        <p className="mt-5 max-w-2xl text-lg text-slate-700">
+        <h1>Find meaningful ways to serve your community.</h1>
+        <p className="home-summary">
           GIVE connects volunteers with local nonprofit organizations that need support.
-          Browse opportunities, book opportunities, and help local organizations create real
-          impact.
+          Discover opportunities, reserve your place, and help create lasting community impact.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/opportunities"
-            className="rounded-lg bg-teal-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-teal-900"
-          >
-            Browse Opportunities
+        <div className="home-actions">
+          <Link href="/opportunities" className="home-primary-action">
+            Browse opportunities
           </Link>
-
-          <Link
-            href="/register"
-            className="rounded-lg border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800 transition hover:border-teal-800 hover:text-teal-900"
-          >
-            Create Account
+          <Link href="/register" className="home-secondary-action">
+            Create an account
           </Link>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-3xl border border-slate-200 bg-slate-900 p-6 text-white shadow-sm md:p-8">
-        <h2 className="text-2xl font-semibold">How GIVE works</h2>
+      <section className="home-process" aria-labelledby="home-process-title">
+        <div className="home-process-heading">
+          <p className="home-eyebrow">A SIMPLE WAY TO MAKE A DIFFERENCE</p>
+          <h2 id="home-process-title">How GIVE works</h2>
+        </div>
 
-        <ol className="mt-5 space-y-4 text-slate-200">
+        <ol className="home-steps">
           <li>
-            <strong className="text-white">1. Nonprofits post opportunities.</strong> Approved organizations
-            can then publish volunteer opportunities with dates, location, capacity, and requirements.
+            <span className="home-step-number">01</span>
+            <div>
+              <h3>Organizations share a need</h3>
+              <p>Nonprofits publish volunteer opportunities with the details you need.</p>
+            </div>
           </li>
           <li>
-            <strong className="text-white">2. Volunteers discover opportunities.</strong> Visitors can browse
-            public listings and view details before signing up.
+            <span className="home-step-number">02</span>
+            <div>
+              <h3>Volunteers find a fit</h3>
+              <p>Explore local opportunities and choose a cause that matters to you.</p>
+            </div>
           </li>
           <li>
-            <strong className="text-white">3. Volunteers book service.</strong> Registered volunteers can reserve
-            a spot and use GIVE to manage their bookings.
-          </li>
-          <li>
-            <strong className="text-white">4. Volunteers and nonprofits track participation.</strong> Organizations can
-            review signups and record attendance.
+            <span className="home-step-number">03</span>
+            <div>
+              <h3>Everyone tracks the impact</h3>
+              <p>Manage bookings and record participation in one place.</p>
+            </div>
           </li>
         </ol>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

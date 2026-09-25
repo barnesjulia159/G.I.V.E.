@@ -221,12 +221,17 @@ export function VolunteerHoursDashboard() {
         {Object.keys(byOpportunity).length === 0 ? (
           <p className="mt-3 rounded-xl bg-white p-5 text-slate-600">No logged hours yet.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-xl bg-white shadow-sm">
+          <div
+            className="table-scroll mt-3 rounded-xl bg-white shadow-sm"
+            role="region"
+            aria-label="Hours by opportunity table"
+            tabIndex={0}
+          >
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b text-slate-500">
-                  <th className="px-5 py-3">Opportunity</th>
-                  <th className="px-5 py-3">Hours</th>
+                  <th scope="col" className="px-5 py-3">Opportunity</th>
+                  <th scope="col" className="px-5 py-3">Hours</th>
                 </tr>
               </thead>
               <tbody>

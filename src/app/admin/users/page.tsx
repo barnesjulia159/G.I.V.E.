@@ -32,16 +32,21 @@ async function AdminUsersContent() {
 
       {error && <p className="alert-error mb-4">{error.message}</p>}
 
-      <div className="overflow-x-auto rounded-xl bg-white p-6 shadow-sm">
+      <div
+        className="table-scroll rounded-xl bg-white p-6 shadow-sm"
+        role="region"
+        aria-label="Users table"
+        tabIndex={0}
+      >
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-slate-600">
-              <th className="py-3 pr-4">Name</th>
-              <th className="py-3 pr-4">Role</th>
-              <th className="py-3 pr-4">Approval</th>
-              <th className="py-3 pr-4">Status</th>
-              <th className="py-3 pr-4">Location</th>
-              <th className="py-3 pr-4">Created</th>
+              <th scope="col" className="py-3 pr-4">Name</th>
+              <th scope="col" className="py-3 pr-4">Role</th>
+              <th scope="col" className="py-3 pr-4">Approval</th>
+              <th scope="col" className="py-3 pr-4">Status</th>
+              <th scope="col" className="py-3 pr-4">Location</th>
+              <th scope="col" className="py-3 pr-4">Created</th>
             </tr>
           </thead>
 
