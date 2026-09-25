@@ -94,46 +94,6 @@ export async function updateVolunteerBio(formData: FormData) {
   redirect("/volunteer/profile?message=Bio updated.");
 }
 
-export async function updateVolunteerProfilePhoto(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const rawAvatarUrl = String(formData.get("avatar_url") || "").trim();
-  let avatarUrl: string | null = rawAvatarUrl || null;
-
-  if (avatarUrl) {
-    try {
-      const parsedUrl = new URL(avatarUrl);
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("Profile photo must be an HTTP or HTTPS image URL.");
-      }
-      avatarUrl = parsedUrl.toString();
-    } catch {
-      redirect(
-        `/volunteer/profile?error=${encodeURIComponent("Enter a valid image URL.")}`
-      );
-    }
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ avatar_url: avatarUrl })
-    .eq("id", user.id);
-
-  if (error) {
-    redirect(`/volunteer/profile?error=${encodeURIComponent(error.message)}`);
-  }
-
-  redirect("/volunteer/profile?message=Profile photo updated.");
-}
-
 export async function updateVolunteerAvailability(formData: FormData) {
   const supabase = await createClient();
 

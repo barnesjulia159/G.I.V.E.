@@ -80,115 +80,123 @@ async function VolunteerDashboardContent() {
   const availableDays = availability.filter((d) => d.am || d.pm);
 
   return (
-    <section>
-      <div className="rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-4xl font-bold">Welcome, {displayName}</h1>
-        <p className="mt-2 text-slate-700">
-          Use your dashboard to discover opportunities, manage your bookings,
-          and keep your volunteer profile up to date.
-        </p>
-      </div>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">Active Bookings</p>
-          <p className="mt-2 text-4xl font-bold text-emerald-700">
-            {activeBookingCount ?? 0}
+    <section className="volunteer-dashboard">
+      <header className="volunteer-dashboard-welcome">
+        <div>
+          <p className="volunteer-dashboard-eyebrow">VOLUNTEER OVERVIEW</p>
+          <h1>Welcome back, {displayName}</h1>
+          <p className="volunteer-dashboard-intro">
+            Find your next opportunity, keep track of your commitments, and update your profile.
           </p>
         </div>
-
-        <Link
-          href="/opportunities"
-          className="rounded-xl bg-white p-5 shadow-sm hover:ring-2 hover:ring-emerald-600"
-        >
-          <h2 className="text-xl font-semibold">Find Opportunities</h2>
-          <p className="mt-2 text-slate-700">
-            Browse available volunteer opportunities near you.
-          </p>
+        <Link href="/opportunities" className="volunteer-dashboard-primary">
+          Explore opportunities
         </Link>
+      </header>
 
-        <Link
-          href="/volunteer/profile"
-          className="rounded-xl bg-white p-5 shadow-sm hover:ring-2 hover:ring-emerald-600"
-        >
-          <h2 className="text-xl font-semibold">Edit Profile</h2>
-          <p className="mt-2 text-slate-700">
-            Update your contact details, settings and availability.
-          </p>
-        </Link>
-      </div>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Bio</h2>
-          <p className="mt-2 whitespace-pre-wrap text-slate-700">
-            {profile?.bio || "No biography has been added yet."}
-          </p>
+      <section className="volunteer-dashboard-actions" aria-label="Quick actions">
+        <div className="volunteer-booking-stat">
+          <p>Active bookings</p>
+          <strong>{activeBookingCount ?? 0}</strong>
+          <span>Upcoming volunteer commitments</span>
         </div>
 
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Contact</h2>
-          <dl className="mt-2 space-y-2 text-slate-700">
+        <Link href="/opportunities" className="volunteer-action-link">
+          <span className="volunteer-action-icon" aria-hidden="true">＋</span>
+          <span>
+            <strong>Find opportunities</strong>
+            <small>Browse ways to help in your community</small>
+          </span>
+          <span className="volunteer-action-arrow" aria-hidden="true">→</span>
+        </Link>
+
+        <Link href="/volunteer/profile" className="volunteer-action-link">
+          <span className="volunteer-action-icon" aria-hidden="true">↗</span>
+          <span>
+            <strong>Edit your profile</strong>
+            <small>Keep your details and availability current</small>
+          </span>
+          <span className="volunteer-action-arrow" aria-hidden="true">→</span>
+        </Link>
+
+        <Link href="/volunteer/hours" className="volunteer-action-link">
+          <span className="volunteer-action-icon" aria-hidden="true">◷</span>
+          <span>
+            <strong>Volunteer hours</strong>
+            <small>Review your recorded service time</small>
+          </span>
+          <span className="volunteer-action-arrow" aria-hidden="true">→</span>
+        </Link>
+      </section>
+
+      <section className="volunteer-dashboard-details" aria-label="Your profile summary">
+        <article className="volunteer-summary-panel volunteer-bio-panel">
+          <p className="volunteer-panel-eyebrow">YOUR PROFILE</p>
+          <h2>About you</h2>
+          <p className="volunteer-bio-copy">
+            {profile?.bio || "Add a short introduction to help organizations get to know you."}
+          </p>
+        </article>
+
+        <article className="volunteer-summary-panel">
+          <p className="volunteer-panel-eyebrow">CONTACT</p>
+          <h2>Contact details</h2>
+          <dl className="volunteer-summary-list">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Phone
-              </dt>
+              <dt>Phone</dt>
               <dd>{profile?.phone || "Not provided"}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Location
-              </dt>
+              <dt>Location</dt>
               <dd>{location || "Not provided"}</dd>
             </div>
           </dl>
-        </div>
+        </article>
 
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Availability</h2>
+        <article className="volunteer-summary-panel">
+          <p className="volunteer-panel-eyebrow">WHEN YOU CAN HELP</p>
+          <h2>Availability</h2>
           {availableDays.length === 0 ? (
-            <p className="mt-2 text-slate-500">No availability has been set.</p>
+            <p className="volunteer-empty-summary">No availability set yet.</p>
           ) : (
-            <ul className="mt-2 space-y-1 text-slate-700">
+            <ul className="volunteer-availability-list">
               {availableDays.map(({ day, am, pm }) => (
-                <li key={day} className="capitalize">
-                  {day}: {[am && "AM", pm && "PM"].filter(Boolean).join(", ")}
+                <li key={day}>
+                  <span>{day}</span>
+                  <span>{[am && "AM", pm && "PM"].filter(Boolean).join(" · ")}</span>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </article>
 
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Skills &amp; Causes</h2>
+        <article className="volunteer-summary-panel">
+          <p className="volunteer-panel-eyebrow">YOUR INTERESTS</p>
+          <h2>Skills &amp; causes</h2>
           {skills.length === 0 && causes.length === 0 ? (
-            <p className="mt-2 text-slate-500">
-              No skills and causes have been added.
-            </p>
+            <p className="volunteer-empty-summary">No skills or causes added yet.</p>
           ) : (
-            <div className="mt-2 space-y-3">
+            <div className="volunteer-interest-groups">
               {skills.length > 0 && (
-                <div className="skills-container">
-                  {skills.map((skill) => (
-                    <span key={skill} className="skill-tag">
-                      {skill}
-                    </span>
-                  ))}
+                <div>
+                  <h3>Skills</h3>
+                  <ul className="volunteer-interest-list">
+                    {skills.map((skill) => <li key={skill}>{skill}</li>)}
+                  </ul>
                 </div>
               )}
               {causes.length > 0 && (
-                <div className="skills-container">
-                  {causes.map((cause) => (
-                    <span key={cause} className="skill-tag">
-                      {cause}
-                    </span>
-                  ))}
+                <div>
+                  <h3>Causes</h3>
+                  <ul className="volunteer-interest-list">
+                    {causes.map((cause) => <li key={cause}>{cause}</li>)}
+                  </ul>
                 </div>
               )}
             </div>
           )}
-        </div>
-      </div>
+        </article>
+      </section>
     </section>
   );
 }

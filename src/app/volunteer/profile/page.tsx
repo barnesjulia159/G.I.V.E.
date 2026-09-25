@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,6 @@ import {
   updateVolunteerAvailability,
   updateVolunteerBio,
   updateVolunteerContact,
-  updateVolunteerProfilePhoto,
 } from "@/lib/actions/profiles";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -36,15 +36,6 @@ function parseAvailability(raw: string | null): WeekAvailability {
 }
 
 
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
 
 function formatLabel(value: string) {
   return value
@@ -113,74 +104,47 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const availability = parseAvailability(profile.availabilityNotes);
 
   return (
-    <section className="dashboard-container">
-      <div className="space-y-6">
-        <section className="profile-card overflow-hidden p-0">
-          <div className="h-32 bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600" />
-
-          <div className="px-6 pb-8 sm:px-10">
-            <div className="-mt-14 flex flex-col gap-5 sm:flex-row sm:items-end">
-              {profile.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.avatarUrl}
-                  alt={`${fullName} profile photo`}
-                  className="profile-avatar shrink-0 border-white object-cover shadow-md"
-                />
-              ) : (
-                <div className="profile-avatar shrink-0 border-white bg-slate-900 font-bold text-white shadow-md">
-                  {getInitials(fullName) || "P"}
-                </div>
-              )}
-
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="profile-name tracking-tight">
-                    {fullName}
-                  </h1>
-
-                  <span
-                    className={[
-                      "rounded-full px-3 py-1 text-xs font-semibold",
-                      profile.isActive
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-slate-200 text-slate-700",
-                    ].join(" ")}
-                  >
-                    {profile.isActive ? "Active" : "Inactive"}
-                  </span>
-                </div>
-
-                {profile.displayName !== fullName && (
-                  <p className="mt-1 text-sm text-slate-500">
-                    {profile.displayName}
-                  </p>
-                )}
-
-                <p className="profile-role mt-2">
-                  {formatLabel(profile.role)}
-                  {location ? ` · ${location}` : ""}
-                </p>
-              </div>
-
-              <div
-                className={[
-                  "w-fit rounded-full px-4 py-2 text-sm font-semibold",
-                  profile.approvalStatus === "approved"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : profile.approvalStatus === "rejected"
-                      ? "bg-rose-100 text-rose-800"
-                      : "bg-amber-100 text-amber-800",
-                ].join(" ")}
-              >
-              </div>
-
-              
-            </div>
+    <section className="profile-page">
+      <header className="profile-overview">
+        <div>
+          <Link
+            href="/volunteer/dashboard"
+            className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-700 hover:text-teal-800"
+          >
+            <span aria-hidden="true">←</span>
+            Back to dashboard
+          </Link>
+          <p className="profile-overline">VOLUNTEER PROFILE</p>
+          <div className="profile-heading-row">
+            <h1>{fullName}</h1>
+            <span
+              className={`profile-status ${profile.isActive ? "is-active" : "is-inactive"}`}
+            >
+              {profile.isActive ? "Active" : "Inactive"}
+            </span>
           </div>
-        </section>
+          {profile.displayName !== fullName && (
+            <p className="profile-display-name">{profile.displayName}</p>
+          )}
+          <p className="profile-subtitle">
+            {formatLabel(profile.role)}
+            {location ? ` · ${location}` : ""}
+          </p>
+        </div>
+        <span
+          className={`profile-approval ${
+            profile.approvalStatus === "approved"
+              ? "is-approved"
+              : profile.approvalStatus === "rejected"
+                ? "is-rejected"
+                : "is-pending"
+          }`}
+        >
+          {formatLabel(profile.approvalStatus)} approval
+        </span>
+      </header>
 
-        <div className="profile-grid">
+      <div className="profile-grid">
           <div className="space-y-6">
             <ProfileSection title="About">
               <form action={updateVolunteerBio} className="space-y-4">
@@ -254,26 +218,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
 
           <div className="space-y-6">
-            <ProfileSection title="Profile photo">
-              <form action={updateVolunteerProfilePhoto} className="space-y-4">
-                <div className="form-field">
-                  <label htmlFor="avatar_url" className="form-label">
-                    Image URL
-                  </label>
-                  <input
-                    id="avatar_url"
-                    name="avatar_url"
-                    type="url"
-                    defaultValue={profile.avatarUrl ?? ""}
-                    placeholder="https://example.com/profile-photo.jpg"
-                    className="form-input"
-                  />
-                </div>
-
-                <SubmitButton>Save profile photo</SubmitButton>
-              </form>
-            </ProfileSection>
-
             <ProfileSection title="Contact">
               {message && <p className="alert-info mb-4">{message}</p>}
               {error && <p className="alert-error mb-4">{error}</p>}
@@ -359,7 +303,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             </ProfileSection>
           </div>
         </div>
-      </div>
     </section>
   );
 }
@@ -373,7 +316,7 @@ function ProfileSection({
 }) {
   return (
     <section className="profile-card">
-      <h2 className="mb-5 text-lg font-semibold">{title}</h2>
+      <h2 className="profile-section-title">{title}</h2>
       {children}
     </section>
   );
