@@ -7,6 +7,7 @@ import {
   updateVolunteerAvailability,
   updateVolunteerBio,
   updateVolunteerContact,
+  updateVolunteerProfilePhoto,
 } from "@/lib/actions/profiles";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -112,20 +113,29 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const availability = parseAvailability(profile.availabilityNotes);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-950">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="dashboard-container">
+      <div className="space-y-6">
+        <section className="profile-card overflow-hidden p-0">
           <div className="h-32 bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600" />
 
           <div className="px-6 pb-8 sm:px-10">
             <div className="-mt-14 flex flex-col gap-5 sm:flex-row sm:items-end">
-              <div className="grid size-28 shrink-0 place-items-center rounded-full border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-md">
-                {getInitials(fullName) || "P"}
-              </div>
+              {profile.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.avatarUrl}
+                  alt={`${fullName} profile photo`}
+                  className="profile-avatar shrink-0 border-white object-cover shadow-md"
+                />
+              ) : (
+                <div className="profile-avatar shrink-0 border-white bg-slate-900 font-bold text-white shadow-md">
+                  {getInitials(fullName) || "P"}
+                </div>
+              )}
 
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-bold tracking-tight">
+                  <h1 className="profile-name tracking-tight">
                     {fullName}
                   </h1>
 
@@ -147,7 +157,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   </p>
                 )}
 
-                <p className="mt-2 text-slate-600">
+                <p className="profile-role mt-2">
                   {formatLabel(profile.role)}
                   {location ? ` · ${location}` : ""}
                 </p>
@@ -170,7 +180,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         </section>
 
-        <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
+        <div className="profile-grid">
           <div className="space-y-6">
             <ProfileSection title="About">
               <form action={updateVolunteerBio} className="space-y-4">
@@ -262,6 +272,26 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
 
           <div className="space-y-6">
+            <ProfileSection title="Profile photo">
+              <form action={updateVolunteerProfilePhoto} className="space-y-4">
+                <div className="form-field">
+                  <label htmlFor="avatar_url" className="form-label">
+                    Image URL
+                  </label>
+                  <input
+                    id="avatar_url"
+                    name="avatar_url"
+                    type="url"
+                    defaultValue={profile.avatarUrl ?? ""}
+                    placeholder="https://example.com/profile-photo.jpg"
+                    className="form-input"
+                  />
+                </div>
+
+                <SubmitButton>Save profile photo</SubmitButton>
+              </form>
+            </ProfileSection>
+
             <ProfileSection title="Contact">
               {message && <p className="alert-info mb-4">{message}</p>}
               {error && <p className="alert-error mb-4">{error}</p>}
@@ -348,7 +378,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         </div>
       </div>
-    </main>
+    </section>
   );
 }
 
@@ -360,7 +390,7 @@ function ProfileSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="profile-card">
       <h2 className="mb-5 text-lg font-semibold">{title}</h2>
       {children}
     </section>

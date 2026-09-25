@@ -22,15 +22,25 @@ export async function AppHeader() {
     role = profile?.role ?? null;
   }
 
+  const navLinkClass = "text-sm font-medium text-slate-600 transition hover:text-teal-800";
+
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
-        <Link href="/" className="text-2xl font-bold text-emerald-800">
-          GIVE
+        <Link href="/" className="flex items-center gap-3 text-slate-950">
+          <span className="grid size-10 place-items-center rounded-xl bg-teal-800 text-lg font-bold text-white shadow-sm">
+            G
+          </span>
+          <span className="leading-tight">
+            <span className="block text-xl font-bold tracking-tight">GIVE</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Volunteer Platform
+            </span>
+          </span>
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-4 text-sm">
-          <Link href="/opportunities" className="text-slate-700 hover:text-emerald-700">
+        <nav className="flex flex-wrap items-center gap-4">
+          <Link href="/opportunities" className={navLinkClass}>
             Opportunities
           </Link>
 
@@ -40,13 +50,13 @@ export async function AppHeader() {
 
           {role === "volunteer" && (
             <>
-              <Link href="/volunteer/dashboard" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/volunteer/dashboard" className={navLinkClass}>
                 Volunteer Dashboard
               </Link>
-              <Link href="/volunteer/bookings" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/volunteer/bookings" className={navLinkClass}>
                 My Bookings
               </Link>
-              <Link href="/volunteer/hours" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/volunteer/hours" className={navLinkClass}>
                 Hours
               </Link>
             </>
@@ -54,36 +64,36 @@ export async function AppHeader() {
 
           {role === "nonprofit" && (
             <>
-              <Link href="/nonprofit/dashboard" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/nonprofit/dashboard" className={navLinkClass}>
                 Nonprofit Dashboard
               </Link>
-              <Link href="/nonprofit/opportunities/new" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/nonprofit/opportunities/new" className={navLinkClass}>
                 Post Opportunity
               </Link>
             </>
           )}
 
           {role === "admin" && (
-            <Link href="/admin/dashboard" className="text-slate-700 hover:text-emerald-700">
+            <Link href="/admin/dashboard" className={navLinkClass}>
               Admin
             </Link>
           )}
 
           {!user ? (
             <>
-              <Link href="/login" className="text-slate-700 hover:text-emerald-700">
+              <Link href="/login" className={navLinkClass}>
                 Login
               </Link>
               <Link
                 href="/register"
-                className="rounded-md bg-emerald-700 px-3 py-2 font-medium text-white hover:bg-emerald-800"
+                className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-900"
               >
                 Register
               </Link>
             </>
           ) : (
             <form action={signOut}>
-              <button className="text-slate-700 hover:text-emerald-700">Sign Out</button>
+              <button className={navLinkClass}>Sign Out</button>
             </form>
           )}
         </nav>

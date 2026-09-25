@@ -164,6 +164,7 @@ model Profile {
   state                                                  String?
   zipCode                                                String?              @map("zip_code")
   bio                                                    String?
+  avatarUrl                                              String?              @map("avatar_url")
   availabilityNotes                                      String?              @map("availability_notes")
   approvalStatus                                         ApprovalStatus       @default(approved) @map("approval_status")
   isActive                                               Boolean              @default(true) @map("is_active")
