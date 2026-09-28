@@ -64,10 +64,14 @@ export async function signUp(formData: FormData) {
   }
 
   if (data.user?.email) {
-    await prisma.profile.updateMany({
-      where: { id: data.user.id },
-      data: { email: data.user.email },
-    });
+    try {
+      await prisma.profile.updateMany({
+        where: { id: data.user.id },
+        data: { email: data.user.email },
+      });
+    } catch (syncError) {
+      console.error("Failed to sync profile email after sign-up", syncError);
+    }
   }
 
   redirect("/login?message=Account created. Please log in.");

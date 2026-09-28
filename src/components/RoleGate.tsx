@@ -25,10 +25,21 @@ export async function RoleGate({ allowedRoles, children }: RoleGateProps) {
     redirect("/login");
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { id: user.id },
-    select: { role: true, isActive: true },
-  });
+  let profile: { role: UserRole; isActive: boolean } | null;
+  try {
+    profile = await prisma.profile.findUnique({
+      where: { id: user.id },
+      select: { role: true, isActive: true },
+    });
+  } catch (error) {
+    console.error("RoleGate: Prisma profile lookup failed, falling back to Supabase", error);
+    const { data } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .maybeSingle();
+    profile = data ? { role: data.role as UserRole, isActive: data.is_active !== false } : null;
+  }
 
   if (!profile) {
     redirect(

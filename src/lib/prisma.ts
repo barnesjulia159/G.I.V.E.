@@ -13,6 +13,8 @@ function createPrismaClient() {
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
+    // Default maxWait (2s) is shorter than opening a new remote pool connection.
+    transactionOptions: { maxWait: 10_000, timeout: 15_000 },
     log:
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
