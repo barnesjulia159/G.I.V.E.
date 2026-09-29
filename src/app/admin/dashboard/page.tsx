@@ -48,10 +48,6 @@ async function AdminDashboardContent() {
           value={summary?.total_nonprofits ?? 0}
         />
         <SummaryCard
-          label="Pending Organizations"
-          value={summary?.pending_organizations ?? 0}
-        />
-        <SummaryCard
           label="Published Opportunities"
           value={summary?.published_opportunities ?? 0}
         />

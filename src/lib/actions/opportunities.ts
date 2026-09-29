@@ -50,7 +50,6 @@ async function notifyVolunteersOfPublishedOpportunity({
     where: {
       role: "volunteer",
       isActive: true,
-      approvalStatus: "approved",
     },
     select: { id: true },
   });
@@ -101,16 +100,12 @@ export async function createOpportunity(formData: FormData) {
 
   const { data: organization, error: orgError } = await supabase
     .from("organizations")
-    .select("id, is_approved")
+    .select("id")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (orgError || !organization) {
     redirect("/nonprofit/organization?error=Create an organization profile before posting opportunities.");
-  }
-
-  if (!organization.is_approved) {
-    redirect("/nonprofit/dashboard?error=Your organization must be approved before publishing opportunities.");
   }
 
   const payload = {

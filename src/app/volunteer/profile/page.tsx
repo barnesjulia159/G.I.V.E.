@@ -131,17 +131,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             {location ? ` · ${location}` : ""}
           </p>
         </div>
-        <span
-          className={`profile-approval ${
-            profile.approvalStatus === "approved"
-              ? "is-approved"
-              : profile.approvalStatus === "rejected"
-                ? "is-rejected"
-                : "is-pending"
-          }`}
-        >
-          {formatLabel(profile.approvalStatus)} approval
-        </span>
       </header>
 
       <div className="profile-grid">
@@ -283,11 +272,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <ProfileField
                   label="Role"
                   value={formatLabel(profile.role)}
-                />
-
-                <ProfileField
-                  label="Approval"
-                  value={formatLabel(profile.approvalStatus)}
                 />
 
                 <ProfileField

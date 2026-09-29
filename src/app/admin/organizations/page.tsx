@@ -1,6 +1,4 @@
 import { RoleGate } from "@/components/RoleGate";
-import { SubmitButton } from "@/components/SubmitButton";
-import { approveOrganization } from "@/lib/actions/organizations";
 import { createClient } from "@/lib/supabase/server";
 import { Organization } from "@/lib/types";
 
@@ -55,7 +53,6 @@ async function AdminOrganizationsContent({
       )
     `
     )
-    .order("is_approved", { ascending: true })
     .order("created_at", { ascending: false });
 
   const organizations = (data || []) as OrganizationWithProfile[];
@@ -66,8 +63,7 @@ async function AdminOrganizationsContent({
         <h1 className="text-3xl font-bold">Manage Organizations</h1>
 
         <p className="mt-2 text-slate-700">
-          Review nonprofit organization profiles and approve them for
-          opportunity publishing.
+          Review nonprofit organization profiles.
         </p>
       </div>
 
@@ -126,27 +122,8 @@ async function AdminOrganizationsContent({
                         .filter(Boolean)
                         .join(", ") || "N/A"}
                     </p>
-
-                    <p>
-                      <strong>Status:</strong>{" "}
-                      {organization.is_approved ? "Approved" : "Pending"}
-                    </p>
                   </div>
                 </div>
-
-                {!organization.is_approved && (
-                  <form action={approveOrganization}>
-                    <input
-                      type="hidden"
-                      name="organization_id"
-                      value={organization.id}
-                    />
-
-                    <SubmitButton pendingText="Approving...">
-                      Approve
-                    </SubmitButton>
-                  </form>
-                )}
               </div>
             </article>
           );

@@ -43,7 +43,6 @@ async function AdminUsersContent() {
             <tr className="border-b text-slate-600">
               <th scope="col" className="py-3 pr-4">Name</th>
               <th scope="col" className="py-3 pr-4">Role</th>
-              <th scope="col" className="py-3 pr-4">Approval</th>
               <th scope="col" className="py-3 pr-4">Status</th>
               <th scope="col" className="py-3 pr-4">Location</th>
               <th scope="col" className="py-3 pr-4">Created</th>
@@ -63,10 +62,6 @@ async function AdminUsersContent() {
                 </td>
 
                 <td className="py-3 pr-4 capitalize">{user.role}</td>
-
-                <td className="py-3 pr-4 capitalize">
-                  {user.approval_status}
-                </td>
 
                 <td className="py-3 pr-4">
                   {user.is_active ? "Active" : "Inactive"}

@@ -52,24 +52,3 @@ export async function saveOrganizationProfile(formData: FormData) {
 
   redirect("/nonprofit/dashboard?message=Organization profile saved.");
 }
-
-export async function approveOrganization(formData: FormData) {
-  const organizationId = String(formData.get("organization_id") || "");
-
-  if (!organizationId) {
-    redirect("/admin/organizations?error=Missing organization ID.");
-  }
-
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("organizations")
-    .update({ is_approved: true })
-    .eq("id", organizationId);
-
-  if (error) {
-    redirect(`/admin/organizations?error=${encodeURIComponent(error.message)}`);
-  }
-
-  redirect("/admin/organizations?message=Organization approved.");
-}

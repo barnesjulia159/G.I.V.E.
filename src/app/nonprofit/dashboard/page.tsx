@@ -102,13 +102,6 @@ async function NonprofitDashboardContent({
         <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
         <p className="mt-2 text-slate-700">{org.name}</p>
 
-        {!org.is_approved && (
-          <p className="alert-error mt-4">
-            Your organization is pending admin approval. You can save
-            opportunities as drafts, but publishing may be restricted.
-          </p>
-        )}
-
         {message && <p className="alert-info mt-4">{message}</p>}
         {error && <p className="alert-error mt-4">{error}</p>}
 

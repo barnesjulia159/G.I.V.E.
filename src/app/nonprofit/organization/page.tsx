@@ -52,12 +52,6 @@ async function NonprofitOrganizationContent({
         your organization.
       </p>
 
-      {organization && !organization.is_approved && (
-        <p className="alert-info mt-4">
-          Your organization profile is waiting for admin approval.
-        </p>
-      )}
-
       {message && <p className="alert-info mt-4">{message}</p>}
       {error && <p className="alert-error mt-4">{error}</p>}
 
