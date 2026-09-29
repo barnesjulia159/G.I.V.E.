@@ -48,6 +48,24 @@ export async function signUp(formData: FormData) {
     redirect("/register?error=Email and password are required.");
   }
 
+  const duplicateMessage = "An account with this email already exists. Please log in instead.";
+
+  let emailTaken = false;
+  try {
+    emailTaken = Boolean(
+      await prisma.users.findFirst({
+        where: { email: { equals: email, mode: "insensitive" }, deleted_at: null },
+        select: { id: true },
+      })
+    );
+  } catch (lookupError) {
+    console.error("Duplicate email lookup failed", lookupError);
+  }
+
+  if (emailTaken) {
+    redirect(`/register?error=${encodeURIComponent(duplicateMessage)}`);
+  }
+
   if (!["volunteer", "nonprofit"].includes(role)) {
     redirect("/register?error=Invalid account type.");
   }
@@ -71,7 +89,13 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     console.error("Sign-up failed", error);
-    redirect(`/register?error=${encodeURIComponent(authErrorMessage(error))}`);
+    const message = error.code === "user_already_exists" ? duplicateMessage : authErrorMessage(error);
+    redirect(`/register?error=${encodeURIComponent(message)}`);
+  }
+
+  // Supabase returns a user with no identities (instead of an error) when the email is already registered.
+  if (data.user && (data.user.identities?.length ?? 0) === 0) {
+    redirect(`/register?error=${encodeURIComponent(duplicateMessage)}`);
   }
 
   if (data.user?.email) {
