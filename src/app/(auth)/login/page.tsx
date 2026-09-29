@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { signIn } from "@/lib/actions/auth";
+import { resendConfirmation, signIn } from "@/lib/actions/auth";
 import { SubmitButton } from "@/components/SubmitButton";
 
 type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
     message?: string;
+    unconfirmed?: string;
   }>;
 };
 
@@ -34,6 +35,28 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {params.error && <p className="alert-error mt-4">{params.error}</p>}
         {params.message && <p className="alert-info mt-4">{params.message}</p>}
 
+        {(params.unconfirmed !== undefined || params.error?.includes("confirmation")) && (
+          <form action={resendConfirmation} className="auth-form">
+            <div className="form-field">
+              <label htmlFor="resend-email" className="form-label">
+                Didn&apos;t get a working link? Resend the confirmation email
+              </label>
+              <input
+                id="resend-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                defaultValue={params.unconfirmed ?? ""}
+                className="form-input"
+              />
+            </div>
+            <SubmitButton className="auth-submit" pendingText="Sending...">
+              Resend confirmation email
+            </SubmitButton>
+          </form>
+        )}
+
         <form action={signIn} className="auth-form">
           <div className="form-field">
             <label htmlFor="email" className="form-label">
@@ -47,6 +70,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               Password
             </label>
             <input id="password" name="password" type="password" autoComplete="current-password" required className="form-input" />
+            <Link href="/forgot-password" className="auth-inline-link">
+              Forgot password?
+            </Link>
           </div>
 
           <SubmitButton className="auth-submit">Log in</SubmitButton>

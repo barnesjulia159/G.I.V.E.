@@ -31,7 +31,11 @@ export async function signIn(formData: FormData) {
 
   if (error) {
     console.error("Sign-in failed", error);
-    redirect(`/login?error=${encodeURIComponent(authErrorMessage(error))}`);
+    const params = new URLSearchParams({ error: authErrorMessage(error) });
+    if (error.code === "email_not_confirmed") {
+      params.set("unconfirmed", email);
+    }
+    redirect(`/login?${params}`);
   }
 
   redirect("/volunteer/dashboard");
@@ -110,6 +114,85 @@ export async function signUp(formData: FormData) {
   }
 
   redirect("/login?message=Account created. Please log in.");
+}
+
+export async function resendConfirmation(formData: FormData) {
+  const email = String(formData.get("email") || "").trim();
+
+  if (!email) {
+    redirect("/login?error=Enter your email to resend the confirmation.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/callback`,
+    },
+  });
+
+  if (error) {
+    console.error("Resend confirmation failed", error);
+    const params = new URLSearchParams({ error: authErrorMessage(error), unconfirmed: email });
+    redirect(`/login?${params}`);
+  }
+
+  redirect("/login?message=A new confirmation email has been sent. Use the newest link in your inbox.");
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get("email") || "").trim();
+
+  if (!email) {
+    redirect("/forgot-password?error=Enter your email address.");
+  }
+
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/callback?next=/reset-password`,
+  });
+
+  if (error) {
+    console.error("Password reset request failed", error);
+    redirect(`/forgot-password?error=${encodeURIComponent(authErrorMessage(error))}`);
+  }
+
+  // Same message whether or not the account exists, so emails can't be probed.
+  redirect("/forgot-password?message=If an account exists for that email, a password reset link has been sent.");
+}
+
+export async function updatePassword(formData: FormData) {
+  const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirm_password") || "");
+
+  if (password.length < 6) {
+    redirect("/reset-password?error=Password must be at least 6 characters.");
+  }
+
+  if (password !== confirmPassword) {
+    redirect("/reset-password?error=Passwords do not match.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/forgot-password?error=Your reset link has expired. Please request a new one.");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    console.error("Password update failed", error);
+    redirect(`/reset-password?error=${encodeURIComponent(authErrorMessage(error))}`);
+  }
+
+  await supabase.auth.signOut();
+  redirect("/login?message=Your password has been updated. Please log in.");
 }
 
 export async function signOut() {
