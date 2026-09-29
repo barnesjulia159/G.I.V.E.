@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 
+function authErrorMessage(error: { message?: string; status?: number }) {
+  const message = error.message?.trim();
+  // Network-level fetch failures surface as an empty "{}" message.
+  if (!message || message === "{}") {
+    return "We couldn't reach the authentication service. Please try again.";
+  }
+  return message;
+}
+
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
@@ -21,7 +30,8 @@ export async function signIn(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    console.error("Sign-in failed", error);
+    redirect(`/login?error=${encodeURIComponent(authErrorMessage(error))}`);
   }
 
   redirect("/volunteer/dashboard");
@@ -60,7 +70,8 @@ export async function signUp(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/register?error=${encodeURIComponent(error.message)}`);
+    console.error("Sign-up failed", error);
+    redirect(`/register?error=${encodeURIComponent(authErrorMessage(error))}`);
   }
 
   if (data.user?.email) {
