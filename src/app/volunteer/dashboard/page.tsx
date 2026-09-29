@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
 import { createClient } from "@/lib/supabase/server";
+import { signOut } from "@/lib/actions/auth";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 
 function parseSkillsAndCauses(raw: string | null): {
@@ -89,9 +90,16 @@ async function VolunteerDashboardContent() {
             Find your next opportunity, keep track of your commitments, and update your profile.
           </p>
         </div>
-        <Link href="/opportunities" className="volunteer-dashboard-primary">
-          Explore opportunities
-        </Link>
+        <div className="volunteer-dashboard-header-actions">
+          <Link href="/opportunities" className="volunteer-dashboard-primary">
+            Explore opportunities
+          </Link>
+          <form action={signOut}>
+            <button type="submit" className="dashboard-signout">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <section className="volunteer-dashboard-actions" aria-label="Quick actions">

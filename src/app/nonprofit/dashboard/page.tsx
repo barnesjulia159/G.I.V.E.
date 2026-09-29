@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
 import { SubmitButton } from "@/components/SubmitButton";
 import { archiveOpportunity } from "@/lib/actions/opportunities";
+import { signOut } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Opportunity, Organization } from "@/lib/types";
 
@@ -82,6 +83,12 @@ async function NonprofitDashboardContent({
         >
           Create Organization Profile
         </Link>
+
+        <form action={signOut} className="mt-4">
+          <button type="submit" className="dashboard-signout">
+            Sign out
+          </button>
+        </form>
       </section>
     );
   }
@@ -119,6 +126,12 @@ async function NonprofitDashboardContent({
           >
             Edit Organization Profile
           </Link>
+
+          <form action={signOut} className="ml-auto">
+            <button type="submit" className="dashboard-signout">
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
 

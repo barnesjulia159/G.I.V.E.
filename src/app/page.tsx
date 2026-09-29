@@ -30,6 +30,9 @@ export default function HomePage() {
           <Link href="/register" className="home-secondary-action">
             Create an account
           </Link>
+          <Link href="/login" className="home-secondary-action">
+            Log in
+          </Link>
         </div>
       </section>
 
