@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const tokenHash = requestUrl.searchParams.get("token_hash");
   const nextParam = requestUrl.searchParams.get("next");
   // Only allow same-site relative paths to prevent open redirects.
   const next = nextParam && /^\/(?!\/)/.test(nextParam) ? nextParam : null;
@@ -25,12 +26,14 @@ export async function GET(request: Request) {
     });
   }
 
-  if (!code) {
+  if (!code && !(tokenHash && next === "/reset-password")) {
     return toLogin({ error: "Invalid confirmation link." });
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = tokenHash && next === "/reset-password"
+    ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" })
+    : await supabase.auth.exchangeCodeForSession(code!);
 
   if (error) {
     if (next === "/reset-password") {
