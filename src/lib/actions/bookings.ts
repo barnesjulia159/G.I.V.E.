@@ -102,7 +102,13 @@ export async function createBooking(formData: FormData) {
     });
   }
 
-  await prisma.notification.createMany({ data: notifications });
+  let notificationsSent = true;
+  try {
+    await prisma.notification.createMany({ data: notifications });
+  } catch (notificationError) {
+    notificationsSent = false;
+    console.error("Booking notifications failed:", notificationError);
+  }
 
   if (user.email) {
     try {
@@ -124,7 +130,11 @@ export async function createBooking(formData: FormData) {
     }
   }
 
-  redirect("/volunteer/bookings?message=You are booked for this opportunity.");
+  const params = new URLSearchParams({ message: "You are booked for this opportunity." });
+  if (!notificationsSent) {
+    params.set("error", "Booking confirmed, but in-app notifications could not be sent.");
+  }
+  redirect(`/volunteer/bookings?${params}`);
 }
 
 export async function cancelBooking(formData: FormData) {
