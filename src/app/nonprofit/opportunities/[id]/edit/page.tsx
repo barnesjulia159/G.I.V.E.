@@ -48,6 +48,16 @@ async function EditOpportunityContent({
   }
 
   const opportunity = data as Opportunity;
+  const [skillResult, causeResult] = await Promise.all([
+    supabase.from("opportunity_skills").select("skills(name)").eq("opportunity_id", id),
+    supabase.from("opportunity_causes").select("causes(name)").eq("opportunity_id", id),
+  ]);
+  const skillNames = (skillResult.data ?? []).flatMap(({ skills }) =>
+    (Array.isArray(skills) ? skills : [skills]).map((skill) => skill?.name).filter(Boolean)
+  );
+  const causeNames = (causeResult.data ?? []).flatMap(({ causes }) =>
+    (Array.isArray(causes) ? causes : [causes]).map((cause) => cause?.name).filter(Boolean)
+  );
 
   return (
     <section className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-sm">
@@ -59,6 +69,20 @@ async function EditOpportunityContent({
       </p>
 
       {error && <p className="alert-error mt-4">{error}</p>}
+      {skillResult.error || causeResult.error ? (
+        <p role="alert" className="alert-error mt-4">Skills and causes could not be loaded.</p>
+      ) : (
+        <dl className="mt-6 grid gap-4 border-y border-slate-200 py-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-sm font-medium text-slate-500">Requested skills</dt>
+            <dd className="text-slate-700">{skillNames.length ? skillNames.join(", ") : "None specified"}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-medium text-slate-500">Related causes</dt>
+            <dd className="text-slate-700">{causeNames.length ? causeNames.join(", ") : "None specified"}</dd>
+          </div>
+        </dl>
+      )}
 
       <form action={updateOpportunity} className="mt-6 space-y-4">
         <input type="hidden" name="opportunity_id" value={opportunity.id} />

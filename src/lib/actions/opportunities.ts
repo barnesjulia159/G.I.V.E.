@@ -117,6 +117,16 @@ export async function createOpportunity(formData: FormData) {
     redirect("/nonprofit/opportunities/new?error=Title, description, start time, end time, and capacity are required.");
   }
 
+  const skillIds = [...new Set(formData.getAll("skill_ids").map(String))];
+  const causeIds = [...new Set(formData.getAll("cause_ids").map(String))];
+  const [{ data: selectedSkills, error: skillsError }, { data: selectedCauses, error: causesError }] = await Promise.all([
+    skillIds.length ? supabase.from("skills").select("id").in("id", skillIds) : Promise.resolve({ data: [], error: null }),
+    causeIds.length ? supabase.from("causes").select("id").in("id", causeIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (skillsError || causesError || selectedSkills?.length !== skillIds.length || selectedCauses?.length !== causeIds.length) {
+    redirect("/nonprofit/opportunities/new?error=Please select valid skills and causes.");
+  }
+
   const { data: createdOpportunity, error } = await supabase
     .from("opportunities")
     .insert(payload)
@@ -125,6 +135,21 @@ export async function createOpportunity(formData: FormData) {
 
   if (error) {
     redirect(`/nonprofit/opportunities/new?error=${encodeURIComponent(error.message)}`);
+  }
+
+  if (createdOpportunity) {
+    const [{ error: skillLinkError }, { error: causeLinkError }] = await Promise.all([
+      skillIds.length
+        ? supabase.from("opportunity_skills").insert(skillIds.map((skillId) => ({ opportunity_id: createdOpportunity.id, skill_id: skillId })))
+        : Promise.resolve({ error: null }),
+      causeIds.length
+        ? supabase.from("opportunity_causes").insert(causeIds.map((causeId) => ({ opportunity_id: createdOpportunity.id, cause_id: causeId })))
+        : Promise.resolve({ error: null }),
+    ]);
+    if (skillLinkError || causeLinkError) {
+      console.error("Failed to save opportunity skills or causes", skillLinkError, causeLinkError);
+      redirect("/nonprofit/dashboard?error=Opportunity created, but skills or causes could not be saved.");
+    }
   }
 
   if (status === "published" && createdOpportunity) {

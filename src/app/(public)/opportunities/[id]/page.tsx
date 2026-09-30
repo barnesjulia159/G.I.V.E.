@@ -35,6 +35,16 @@ export default async function OpportunityDetailsPage({
 	const opportunity = data as PublicOpportunityListing;
 	const startDate = new Date(opportunity.start_at);
 	const endDate = new Date(opportunity.end_at);
+	const [{ data: opportunitySkills }, { data: opportunityCauses }] = await Promise.all([
+		supabase.from("opportunity_skills").select("skills(name)").eq("opportunity_id", id),
+		supabase.from("opportunity_causes").select("causes(name)").eq("opportunity_id", id),
+	]);
+	const skillNames = (opportunitySkills ?? []).flatMap(({ skills }) =>
+		(Array.isArray(skills) ? skills : [skills]).map((skill) => skill?.name).filter(Boolean)
+	);
+	const causeNames = (opportunityCauses ?? []).flatMap(({ causes }) =>
+		(Array.isArray(causes) ? causes : [causes]).map((cause) => cause?.name).filter(Boolean)
+	);
 
 	const {
 		data: { user },
@@ -135,6 +145,16 @@ export default async function OpportunityDetailsPage({
 								<dd>{opportunity.requirements}</dd>
 							</div>
 						)}
+
+						<div>
+							<dt className="text-sm font-medium text-slate-500">Requested skills</dt>
+							<dd>{skillNames.length ? skillNames.join(", ") : "None specified"}</dd>
+						</div>
+
+						<div>
+							<dt className="text-sm font-medium text-slate-500">Related causes</dt>
+							<dd>{causeNames.length ? causeNames.join(", ") : "None specified"}</dd>
+						</div>
 
 						{opportunity.accessibility_notes && (
 							<div>

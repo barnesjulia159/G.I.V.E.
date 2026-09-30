@@ -1,6 +1,7 @@
 import { RoleGate } from "@/components/RoleGate";
 import { SubmitButton } from "@/components/SubmitButton";
 import { createOpportunity } from "@/lib/actions/opportunities";
+import { createClient } from "@/lib/supabase/server";
 
 type NewOpportunityPageProps = {
   searchParams: Promise<{
@@ -30,11 +31,21 @@ export default async function NewOpportunityPage({
   );
 }
 
-function OpportunityForm({
+async function OpportunityForm({
   action,
 }: {
   action: (formData: FormData) => Promise<void>;
 }) {
+  const supabase = await createClient();
+  const [{ data: skills, error: skillsError }, { data: causes, error: causesError }] = await Promise.all([
+    supabase.from("skills").select("id, name").order("name"),
+    supabase.from("causes").select("id, name").order("name"),
+  ]);
+
+  if (skillsError || causesError) {
+    return <p role="alert" className="alert-error mt-6">Skills and causes could not be loaded. Please reload the page.</p>;
+  }
+
   return (
     <form action={action} className="mt-6 space-y-4">
       <div className="form-field">
@@ -167,6 +178,30 @@ function OpportunityForm({
           className="form-input min-h-24"
         />
       </div>
+
+      <fieldset className="form-field">
+        <legend className="form-label">Requested skills</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(skills ?? []).map((skill) => (
+            <label key={skill.id} className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" name="skill_ids" value={skill.id} />
+              {skill.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="form-field">
+        <legend className="form-label">Related causes</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(causes ?? []).map((cause) => (
+            <label key={cause.id} className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" name="cause_ids" value={cause.id} />
+              {cause.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="form-field">
         <label htmlFor="accessibility_notes" className="form-label">
