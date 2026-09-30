@@ -4,6 +4,7 @@ import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Auth <onboarding@resend.dev>"; // change later
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const APP_SITE_URL = Deno.env.get("APP_SITE_URL");
 const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET")?.replace("v1,whsec_", "");
 
 function hookError(status: number, message: string) {
@@ -86,11 +87,17 @@ serve(async (req: Request) => {
         `;
         break;
       case "recovery":
+        if (!APP_SITE_URL) {
+          return hookError(500, "APP_SITE_URL is not configured");
+        }
         subject = "Reset your password";
+        const recoveryUrl = new URL("/callback", APP_SITE_URL);
+        recoveryUrl.searchParams.set("next", "/reset-password");
+        recoveryUrl.searchParams.set("token_hash", email_data.token_hash);
         html = `
           <h2>Reset your password</h2>
           <p>Click the link below to reset your password:</p>
-          <p><a href="${confirmationUrl}">Reset password</a></p>
+          <p><a href="${recoveryUrl.toString()}">Reset password</a></p>
         `;
         break;
       case "invite":

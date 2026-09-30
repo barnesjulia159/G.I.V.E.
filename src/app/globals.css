@@ -915,12 +915,18 @@ body {
   background: #e8f4f2;
 }
 
-.volunteer-booking-stat p,
+.volunteer-booking-stat a,
 .volunteer-booking-stat span {
   margin: 0;
   color: #456168;
   font-size: 0.82rem;
   font-weight: 650;
+}
+
+.volunteer-booking-stat a:hover,
+.volunteer-booking-stat a:focus-visible {
+  color: #115e59;
+  text-decoration: underline;
 }
 
 .volunteer-booking-stat strong {

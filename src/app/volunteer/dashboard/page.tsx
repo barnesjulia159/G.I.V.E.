@@ -104,7 +104,7 @@ async function VolunteerDashboardContent() {
 
       <section className="volunteer-dashboard-actions" aria-label="Quick actions">
         <div className="volunteer-booking-stat">
-          <p>Active bookings</p>
+          <Link href="/volunteer/bookings">Active bookings</Link>
           <strong>{activeBookingCount ?? 0}</strong>
           <span>Upcoming volunteer commitments</span>
         </div>
