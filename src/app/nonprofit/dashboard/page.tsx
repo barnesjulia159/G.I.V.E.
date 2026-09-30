@@ -5,6 +5,7 @@ import { archiveOpportunity } from "@/lib/actions/opportunities";
 import { signOut } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Opportunity, Organization } from "@/lib/types";
+import { NotificationBell } from "@/components/NotificationBell";
 
 type NonprofitDashboardPageProps = {
   searchParams: Promise<{
@@ -71,7 +72,10 @@ async function NonprofitDashboardContent({
   if (!org) {
     return (
       <section className="rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
+          <NotificationBell />
+        </div>
         <p className="mt-2 text-slate-700">
           Create your organization profile before posting volunteer
           opportunities.
@@ -99,7 +103,10 @@ async function NonprofitDashboardContent({
   return (
     <section>
       <div className="rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
+          <NotificationBell />
+        </div>
         <p className="mt-2 text-slate-700">{org.name}</p>
 
         {message && <p className="alert-info mt-4">{message}</p>}

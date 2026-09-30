@@ -122,7 +122,7 @@ export type Booking = {
 export type BookingWithOpportunity = Booking & {
   opportunities: Opportunity & {
     organizations: Pick<Organization, "name"> | null;
-  };
+  } | null;
 };
 
 export type AdminPlatformSummary = {

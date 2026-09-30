@@ -3,6 +3,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { AVAILABILITY_DAYS } from "@/lib/types";
+import { NotificationBell } from "@/components/NotificationBell";
 
 function parseSkillsAndCauses(raw: string | null): {
   skills: string[];
@@ -91,6 +92,7 @@ async function VolunteerDashboardContent() {
           </p>
         </div>
         <div className="volunteer-dashboard-header-actions">
+          <NotificationBell />
           <Link href="/opportunities" className="volunteer-dashboard-primary">
             Explore opportunities
           </Link>

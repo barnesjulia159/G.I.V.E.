@@ -109,8 +109,8 @@ async function VolunteerBookingsContent({
         <div className="space-y-4">
           {bookings.map((booking) => {
             const opportunity = booking.opportunities;
-            const startDate = new Date(opportunity.start_at);
-            const scheduleChanged = changedOpportunityIds.has(opportunity.id);
+            const startDate = opportunity ? new Date(opportunity.start_at) : null;
+            const scheduleChanged = opportunity ? changedOpportunityIds.has(opportunity.id) : false;
 
             return (
               <article
@@ -123,32 +123,38 @@ async function VolunteerBookingsContent({
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    {scheduleChanged && (
-                      <span className="mb-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-                        Schedule changed
-                      </span>
+                    {opportunity && startDate ? (
+                      <>
+                        {scheduleChanged && (
+                          <span className="mb-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+                            Schedule changed
+                          </span>
+                        )}
+                        <p className="text-sm font-medium text-emerald-700">
+                          {opportunity.organizations?.name}
+                        </p>
+                        <h2 className="text-2xl font-semibold">{opportunity.title}</h2>
+                        <p className="mt-2 text-slate-700">
+                          {startDate.toLocaleDateString()} at{" "}
+                          {startDate.toLocaleTimeString([], {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                        <p className="text-slate-700">
+                          {[opportunity.location_name, opportunity.city, opportunity.state]
+                            .filter(Boolean)
+                            .join(", ") || "Location TBD"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="text-2xl font-semibold">Opportunity unavailable</h2>
+                        <p className="mt-2 text-slate-700">
+                          Details for this opportunity are no longer available.
+                        </p>
+                      </>
                     )}
-                    <p className="text-sm font-medium text-emerald-700">
-                      {opportunity.organizations?.name}
-                    </p>
-
-                    <h2 className="text-2xl font-semibold">
-                      {opportunity.title}
-                    </h2>
-
-                    <p className="mt-2 text-slate-700">
-                      {startDate.toLocaleDateString()} at{" "}
-                      {startDate.toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
-
-                    <p className="text-slate-700">
-                      {[opportunity.location_name, opportunity.city, opportunity.state]
-                        .filter(Boolean)
-                        .join(", ") || "Location TBD"}
-                    </p>
 
                     <p className="mt-2 text-sm text-slate-500">
                       Status: {booking.status}
@@ -165,7 +171,7 @@ async function VolunteerBookingsContent({
                     </SubmitButton>
                   </form>
                 </div>
-                <AttendanceControls bookingId={booking.id} />
+                {opportunity && <AttendanceControls bookingId={booking.id} />}
               </article>
             );
           })}
