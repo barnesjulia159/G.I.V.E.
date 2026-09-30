@@ -207,6 +207,7 @@ export async function updateOpportunity(formData: FormData) {
   const locationChanged = previousLocation !== updatedLocation;
   const scheduleChanged =
     previousOpportunity?.status === "published" &&
+    status === "published" &&
     (dateChanged || timeChanged || locationChanged);
 
   if (becamePublished) {
