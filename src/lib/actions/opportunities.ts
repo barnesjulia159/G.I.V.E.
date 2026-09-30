@@ -46,42 +46,41 @@ async function notifyVolunteersOfPublishedOpportunity({
   endAt: string;
   location: string;
 }) {
-  const volunteers = await prisma.profile.findMany({
-    where: {
-      role: "volunteer",
-      isActive: true,
-    },
-    select: { id: true },
-  });
+  try {
+    const volunteers = await prisma.profile.findMany({
+      where: { role: "volunteer", isActive: true },
+      select: { id: true },
+    });
 
-  if (!volunteers.length) return;
+    if (!volunteers.length) return true;
 
-  const dateFormatter = new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-  });
-  const timeFormatter = new Intl.DateTimeFormat("en-US", {
-    timeStyle: "short",
-  });
-  const startDate = new Date(startAt);
-  const endDate = new Date(endAt);
-  const message = [
-    `${title} is now available to book.`,
-    `Date: ${dateFormatter.format(startDate)}`,
-    `Time: ${timeFormatter.format(startDate)} - ${timeFormatter.format(endDate)}`,
-    `Location: ${location || "Location TBD"}`,
-  ].join("\n");
+    const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
+    const timeFormatter = new Intl.DateTimeFormat("en-US", { timeStyle: "short" });
+    const startDate = new Date(startAt);
+    const endDate = new Date(endAt);
+    const message = [
+      `${title} is now available to book.`,
+      `Date: ${dateFormatter.format(startDate)}`,
+      `Time: ${timeFormatter.format(startDate)} - ${timeFormatter.format(endDate)}`,
+      `Location: ${location || "Location TBD"}`,
+    ].join("\n");
 
-  await prisma.notification.createMany({
-    data: volunteers.map((volunteer) => ({
-      sender_id: senderId,
-      recipient_id: volunteer.id,
-      opportunity_id: opportunityId,
-      type: "opportunity_published",
-      title: "New volunteer opportunity",
-      message,
-      status: "sent" as const,
-    })),
-  });
+    await prisma.notification.createMany({
+      data: volunteers.map((volunteer) => ({
+        sender_id: senderId,
+        recipient_id: volunteer.id,
+        opportunity_id: opportunityId,
+        type: "opportunity_published",
+        title: "New volunteer opportunity",
+        message,
+        status: "sent" as const,
+      })),
+    });
+    return true;
+  } catch (error) {
+    console.error("Failed to notify volunteers of published opportunity", error);
+    return false;
+  }
 }
 
 export async function createOpportunity(formData: FormData) {
@@ -129,7 +128,7 @@ export async function createOpportunity(formData: FormData) {
   }
 
   if (status === "published" && createdOpportunity) {
-    await notifyVolunteersOfPublishedOpportunity({
+    const notified = await notifyVolunteersOfPublishedOpportunity({
       senderId: user.id,
       opportunityId: createdOpportunity.id,
       title: payload.title,
@@ -137,6 +136,9 @@ export async function createOpportunity(formData: FormData) {
       endAt: payload.end_at,
       location: [payload.location_name, payload.city, payload.state].filter(Boolean).join(", "),
     });
+    if (!notified) {
+      redirect("/nonprofit/dashboard?error=Opportunity published, but volunteer notifications could not be sent.");
+    }
   }
 
   redirect("/nonprofit/dashboard?message=Opportunity created.");
@@ -208,7 +210,7 @@ export async function updateOpportunity(formData: FormData) {
     (dateChanged || timeChanged || locationChanged);
 
   if (becamePublished) {
-    await notifyVolunteersOfPublishedOpportunity({
+    const notified = await notifyVolunteersOfPublishedOpportunity({
       senderId: user.id,
       opportunityId,
       title: payload.title,
@@ -216,6 +218,9 @@ export async function updateOpportunity(formData: FormData) {
       endAt: payload.end_at,
       location: [payload.location_name, payload.city, payload.state].filter(Boolean).join(", "),
     });
+    if (!notified) {
+      redirect("/nonprofit/dashboard?error=Opportunity published, but volunteer notifications could not be sent.");
+    }
   } else if (scheduleChanged) {
     const bookings = await prisma.booking.findMany({
       where: { opportunity_id: opportunityId, status: { not: "cancelled" } },
