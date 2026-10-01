@@ -72,11 +72,19 @@ async function VolunteerBookingsContent({
 
   return (
     <section>
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-bold">My Bookings</h1>
-        <p className="mt-2 text-slate-700">
-          View and manage your current volunteer commitments.
-        </p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white p-6 shadow-sm">
+        <div>
+          <h1 className="text-3xl font-bold">My Bookings</h1>
+          <p className="mt-2 text-slate-700">
+            View and manage your current volunteer commitments.
+          </p>
+        </div>
+        <Link
+          href="/volunteer/dashboard"
+          className="inline-flex rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800"
+        >
+          Back to dashboard
+        </Link>
       </div>
 
       {message && <p className="alert-info mb-4">{message}</p>}
