@@ -71,7 +71,7 @@ async function NonprofitDashboardContent({
 
   if (!org) {
     return (
-      <section className="rounded-xl bg-white p-6 shadow-sm">
+      <section className="rounded-xl bg-white p-6 shadow-sm md:p-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
           <NotificationBell />
@@ -102,7 +102,7 @@ async function NonprofitDashboardContent({
 
   return (
     <section>
-      <div className="rounded-xl bg-white p-6 shadow-sm">
+      <div className="rounded-xl bg-white p-6 shadow-sm md:p-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-3xl font-bold">Nonprofit Dashboard</h1>
           <NotificationBell />
@@ -135,7 +135,7 @@ async function NonprofitDashboardContent({
         </div>
       </div>
 
-      <div className="mt-8 rounded-xl bg-white p-6 shadow-sm">
+      <div className="mt-8 rounded-xl bg-white p-6 shadow-sm md:p-8">
         <h2 className="text-2xl font-semibold">Your Opportunities</h2>
 
         {activeOpportunities.length === 0 ? (
@@ -149,38 +149,47 @@ async function NonprofitDashboardContent({
             aria-label="Your opportunities table"
             tabIndex={0}
           >
-            <table className="min-w-full text-left text-sm">
+            <table className="opportunities-table text-sm">
+              <colgroup>
+                <col className="w-[20%]" />
+                <col className="w-[14%]" />
+                <col className="w-[11%]" />
+                <col className="w-[13%]" />
+                <col className="w-[9%]" />
+                <col className="w-[10%]" />
+                <col className="w-[23%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b text-slate-600">
-                  <th scope="col" className="py-3 pr-4">Title</th>
-                  <th scope="col" className="py-3 pr-4">Date</th>
-                  <th scope="col" className="py-3 pr-4">Status</th>
-                  <th scope="col" className="py-3 pr-4">Max capacity</th>
-                  <th scope="col" className="py-3 pr-4">Sign-ups</th>
-                  <th scope="col" className="py-3 pr-4">Checked-in</th>
-                  <th scope="col" className="py-3 pr-4">Actions</th>
+                  <th scope="col" className="px-4 py-3 text-left">Title</th>
+                  <th scope="col" className="px-4 py-3">Date</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3">Max capacity</th>
+                  <th scope="col" className="px-4 py-3">Sign-ups</th>
+                  <th scope="col" className="px-4 py-3">Checked-in</th>
+                  <th scope="col" className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
 
               <tbody>
                 {activeOpportunities.map((opportunity) => (
                   <tr key={opportunity.id} className="border-b">
-                    <td className="py-3 pr-4 font-medium">
+                    <td className="px-4 py-3 text-left font-medium">
                       {opportunity.title}
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="px-4 py-3">
                       {new Date(opportunity.start_at).toLocaleDateString()}
                     </td>
-                    <td className="py-3 pr-4 capitalize">
+                    <td className="px-4 py-3 capitalize">
                       {opportunity.status}
                     </td>
-                    <td className="py-3 pr-4">{opportunity.capacity}</td>
-                    <td className="py-3 pr-4">
+                    <td className="px-4 py-3">{opportunity.capacity}</td>
+                    <td className="px-4 py-3">
                       {opportunity.bookings?.filter(
                         (booking) => booking.status !== "cancelled"
                       ).length ?? 0}
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="px-4 py-3">
                       {opportunity.bookings?.filter(
                         (booking) =>
                           booking.status !== "cancelled" &&
@@ -189,35 +198,37 @@ async function NonprofitDashboardContent({
                           )
                       ).length ?? 0}
                     </td>
-                    <td className="flex flex-wrap gap-2 py-3 pr-4">
-                      <Link
-                        href={`/nonprofit/opportunities/${opportunity.id}/edit`}
-                        className="rounded-md bg-slate-800 px-3 py-2 text-white hover:bg-slate-900"
-                      >
-                        Edit
-                      </Link>
-
-                      <form action={archiveOpportunity}>
-                        <input
-                          type="hidden"
-                          name="opportunity_id"
-                          value={opportunity.id}
-                        />
-                        <SubmitButton
-                          className="bg-red-700 px-3 py-2 hover:bg-red-800"
-                          pendingText="Archiving..."
-                        >
-                          Archive
-                        </SubmitButton>
-                      </form>
-                      {opportunity.status === "published" && (
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap justify-center gap-2">
                         <Link
-                          href={`/nonprofit/opportunities/${opportunity.id}/participants`}
-                          className="rounded-md border border-slate-300 px-3 py-2 text-slate-800 hover:bg-slate-100"
+                          href={`/nonprofit/opportunities/${opportunity.id}/edit`}
+                          className="rounded-md bg-slate-800 px-3 py-2 text-white hover:bg-slate-900"
                         >
-                          Participants
+                          Edit
                         </Link>
-                      )}
+
+                        <form action={archiveOpportunity}>
+                          <input
+                            type="hidden"
+                            name="opportunity_id"
+                            value={opportunity.id}
+                          />
+                          <SubmitButton
+                            className="bg-red-700 px-3 py-2 hover:bg-red-800"
+                            pendingText="Archiving..."
+                          >
+                            Archive
+                          </SubmitButton>
+                        </form>
+                        {opportunity.status === "published" && (
+                          <Link
+                            href={`/nonprofit/opportunities/${opportunity.id}/participants`}
+                            className="rounded-md border border-slate-300 px-3 py-2 text-slate-800 hover:bg-slate-100"
+                          >
+                            Participants
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

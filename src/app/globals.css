@@ -501,6 +501,13 @@ body {
   min-width: max-content;
 }
 
+.table-scroll table.opportunities-table {
+  width: 100%;
+  min-width: 75rem;
+  table-layout: fixed;
+  text-align: center;
+}
+
 @media (max-width: 767px) {
   header > div {
     flex-direction: row;
@@ -805,7 +812,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  padding: clamp(1.5rem, 3vw, 2.25rem);
+  padding: clamp(1.75rem, 3vw, 2.75rem);
   border: 1px solid #cbdedc;
   border-left: 5px solid var(--teal);
   border-radius: 1rem;
@@ -910,7 +917,7 @@ body {
   min-height: 8rem;
   flex-direction: column;
   justify-content: center;
-  padding: 1.25rem 1.5rem;
+  padding: 1.5rem 1.75rem;
   border-color: #bbd9d5;
   background: #e8f4f2;
 }
@@ -948,7 +955,7 @@ body {
   min-height: 8rem;
   align-items: center;
   gap: 0.9rem;
-  padding: 1.25rem;
+  padding: 1.5rem;
   color: #172b30;
   text-decoration: none;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
@@ -1003,7 +1010,7 @@ body {
 }
 
 .volunteer-summary-panel {
-  padding: 1.35rem 1.5rem;
+  padding: 1.65rem 1.75rem;
 }
 
 .volunteer-summary-panel h2 {
