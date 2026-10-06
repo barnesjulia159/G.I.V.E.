@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getDashboardPath } from "@/lib/role-routing";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -56,5 +57,18 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL(next ?? "/volunteer/dashboard", request.url));
+  if (next) return NextResponse.redirect(new URL(next, request.url));
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", data.user!.id)
+    .maybeSingle();
+  const dashboardPath = getDashboardPath(profile?.role ?? data.user?.user_metadata?.role);
+
+  if (!dashboardPath) {
+    return toLogin({ error: "Your account role could not be determined. Please contact support." });
+  }
+
+  return NextResponse.redirect(new URL(dashboardPath, request.url));
 }

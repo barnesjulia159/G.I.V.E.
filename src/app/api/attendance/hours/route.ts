@@ -89,14 +89,22 @@ export async function GET(request: Request) {
         opportunityTitle: booking.opportunity.title,
         status: attendance?.status ?? booking.status,
         source: "attendance" as const,
+        hoursOverridden: booking.hours_override !== null,
         checkInAt: attendance?.check_in_at ?? null,
         checkOutAt: attendance?.check_out_at ?? null,
         recordedAt: attendance?.recorded_at ?? booking.booked_at,
-        hours: calculateHours(attendance?.check_in_at ?? null, attendance?.check_out_at ?? null),
-        notes: attendance?.notes ?? booking.notes,
+        hours: booking.hours_override ?? calculateHours(attendance?.check_in_at ?? null, attendance?.check_out_at ?? null),
+        notes: booking.hours_override_notes ?? attendance?.notes ?? booking.notes,
       };
     }),
-    ...manualHours.map((entry) => ({
+    ...manualHours
+      .filter((entry) => !bookings.some(
+        (booking) =>
+          booking.volunteer_id === entry.volunteer_id &&
+          booking.opportunity_id === entry.opportunity_id &&
+          booking.hours_override !== null
+      ))
+      .map((entry) => ({
       id: entry.id,
       bookingId: null,
       volunteerId: entry.volunteer_id,
@@ -109,7 +117,7 @@ export async function GET(request: Request) {
       recordedAt: entry.recorded_at,
       hours: entry.hours,
       notes: entry.notes,
-    })),
+      })),
   ].sort((first, second) => second.recordedAt.getTime() - first.recordedAt.getTime());
   const totalHours = data.reduce((total, log) => total + log.hours, 0);
 

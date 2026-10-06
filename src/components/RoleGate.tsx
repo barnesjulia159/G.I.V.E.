@@ -2,12 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
-
-const ROLE_HOME_PATH: Record<UserRole, string> = {
-  volunteer: "/volunteer/dashboard",
-  nonprofit: "/nonprofit/dashboard",
-  admin: "/admin/dashboard",
-};
+import { getDashboardPath } from "@/lib/role-routing";
 
 type RoleGateProps = {
   allowedRoles: UserRole[];
@@ -52,7 +47,7 @@ export async function RoleGate({ allowedRoles, children }: RoleGateProps) {
   }
 
   if (!allowedRoles.includes(profile.role)) {
-    redirect(ROLE_HOME_PATH[profile.role]);
+    redirect(getDashboardPath(profile.role) ?? "/login");
   }
 
   return <>{children}</>;

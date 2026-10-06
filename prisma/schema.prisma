@@ -85,6 +85,10 @@ model Booking {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   opportunity_id     String              @db.Uuid
   volunteer_id       String              @db.Uuid
+  hours_override     Float?
+  hours_override_notes String?
+  hours_override_by  String?             @db.Uuid
+  hours_override_at  DateTime?           @db.Timestamptz(6)
   status             BookingStatus       @default(booked)
   notes              String?
   booked_at          DateTime            @default(now()) @db.Timestamptz(6)
@@ -93,6 +97,7 @@ model Booking {
   updated_at         DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
   attendanceLog      AttendanceLog?
   attendance_records attendance_records?
+  hoursOverrideRecorder Profile?          @relation("BookingHoursOverrideRecorder", fields: [hours_override_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
   opportunity        Opportunity         @relation(fields: [opportunity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   volunteer          Profile             @relation(fields: [volunteer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   notification_logs  notification_logs[]
@@ -189,6 +194,7 @@ model Profile {
   user_skills                                            user_skills[]
   volunteer_hours_volunteer_hours_recorded_byToprofiles  volunteer_hours[]    @relation("volunteer_hours_recorded_byToprofiles")
   volunteer_hours_volunteer_hours_volunteer_idToprofiles volunteer_hours[]    @relation("volunteer_hours_volunteer_idToprofiles")
+  overriddenBookings                                    Booking[]            @relation("BookingHoursOverrideRecorder")
 
   @@index([isActive], map: "idx_profiles_is_active")
   @@index([role], map: "idx_profiles_role")

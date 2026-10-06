@@ -1,25 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttendanceRecorder } from "@/components/AttendanceRecorder";
+import { ManualCheckoutControl } from "@/components/ManualCheckoutControl";
+import { HoursOverrideControl } from "@/components/HoursOverrideControl";
 import { ManualHoursRecorder } from "@/components/ManualHoursRecorder";
 import { RoleGate } from "@/components/RoleGate";
+import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 type ParticipantsPageProps = {
   params: Promise<{ id: string }>;
 };
 
-type ParticipantBooking = {
-  id: string;
-  status: string;
-  profiles: {
-    id: string;
-    display_name: string | null;
-    first_name: string | null;
-    last_name: string | null;
-  }[];
-  attendance_logs: { status: string; recorded_at: string }[];
-};
+function calculateAttendanceHours(checkInAt: Date | null, checkOutAt: Date | null) {
+  if (!checkInAt || !checkOutAt) return 0;
+  const elapsed = checkOutAt.getTime() - checkInAt.getTime();
+  return elapsed > 0 ? elapsed / 3_600_000 : 0;
+}
 
 export default async function ParticipantsPage({ params }: ParticipantsPageProps) {
   const { id } = await params;
@@ -52,21 +49,53 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
 
   if (!opportunity) notFound();
 
-  const { data } = await supabase
-    .from("bookings")
-    .select(
-      `
-      id,
-      status,
-      profiles (id, display_name, first_name, last_name),
-      attendance_logs (status, recorded_at)
-    `
-    )
-    .eq("opportunity_id", opportunityId)
-    .neq("status", "cancelled")
-    .order("booked_at", { ascending: true });
-
-  const bookings = (data ?? []) as ParticipantBooking[];
+  const bookings = await prisma.booking.findMany({
+    where: { opportunity_id: opportunityId, status: { not: "cancelled" } },
+    orderBy: { booked_at: "asc" },
+    select: {
+      id: true,
+      status: true,
+      volunteer_id: true,
+      attendanceLog: {
+        select: {
+          status: true,
+          recorded_at: true,
+          check_in_at: true,
+          check_out_at: true,
+        },
+      },
+    },
+  });
+  const participantProfiles = await prisma.profile.findMany({
+    where: { id: { in: [...new Set(bookings.map((booking) => booking.volunteer_id))] } },
+    select: { id: true, displayName: true, firstName: true, lastName: true, email: true },
+  });
+  const participantById = new Map(participantProfiles.map((profile) => [profile.id, profile]));
+  let hoursOverrides = new Map<string, number>();
+  try {
+    const overrides = await prisma.booking.findMany({
+      where: { opportunity_id: opportunityId, status: { not: "cancelled" }, hours_override: { not: null } },
+      select: { id: true, hours_override: true },
+    });
+    hoursOverrides = new Map(
+      overrides.flatMap((booking) =>
+        booking.hours_override === null ? [] : [[booking.id, booking.hours_override] as const]
+      )
+    );
+  } catch (error) {
+    console.error("Participant hours overrides could not be loaded:", error);
+  }
+  const manualHours = await prisma.volunteer_hours.findMany({
+    where: { opportunity_id: opportunityId },
+    select: { volunteer_id: true, hours: true },
+  });
+  const manualHoursByVolunteer = new Map<string, number>();
+  for (const entry of manualHours) {
+    manualHoursByVolunteer.set(
+      entry.volunteer_id,
+      (manualHoursByVolunteer.get(entry.volunteer_id) ?? 0) + entry.hours
+    );
+  }
 
   return (
     <section className="mx-auto max-w-4xl">
@@ -85,30 +114,68 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
           </div>
         ) : (
           bookings.map((booking) => {
-            const participant = booking.profiles?.[0];
+            const participant = participantById.get(booking.volunteer_id);
             const name =
-              participant?.display_name ||
-              [participant?.first_name, participant?.last_name].filter(Boolean).join(" ") ||
-              "Unknown participant";
+              participant?.displayName ||
+              [participant?.firstName, participant?.lastName].filter(Boolean).join(" ") ||
+              participant?.email ||
+              "Volunteer profile unavailable";
+            const attendance = booking.attendanceLog;
+            const hoursOverride = hoursOverrides.get(booking.id) ?? null;
+            const currentHours = hoursOverride ?? (
+              calculateAttendanceHours(attendance?.check_in_at ?? null, attendance?.check_out_at ?? null) +
+              (manualHoursByVolunteer.get(booking.volunteer_id) ?? 0)
+            );
 
             return (
               <article key={booking.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white p-5 shadow-sm">
                 <div>
                   <h2 className="font-semibold text-slate-950">{name}</h2>
                   <p className="mt-1 text-sm capitalize text-slate-600">Booking: {booking.status}</p>
-                  {booking.attendance_logs?.[0]?.recorded_at && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Recorded {new Date(booking.attendance_logs[0].recorded_at).toLocaleString()}
-                    </p>
-                  )}
+                  <dl className="mt-2 space-y-1 text-sm text-slate-600">
+                    <div className="flex flex-wrap gap-x-1">
+                      <dt className="font-medium">Checked in:</dt>
+                      <dd>
+                        {attendance?.check_in_at
+                          ? attendance.check_in_at.toLocaleString()
+                          : "Not recorded"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-wrap gap-x-1">
+                      <dt className="font-medium">Checked out:</dt>
+                      <dd>
+                        {attendance?.check_out_at
+                          ? attendance.check_out_at.toLocaleString()
+                          : "Not recorded"}
+                      </dd>
+                    </div>
+                    {attendance?.recorded_at && (
+                      <div className="flex flex-wrap gap-x-1 text-xs text-slate-500">
+                        <dt>Attendance recorded:</dt>
+                        <dd>{attendance.recorded_at.toLocaleString()}</dd>
+                      </div>
+                    )}
+                  </dl>
                 </div>
                 <AttendanceRecorder
                   bookingId={booking.id}
-                  initialStatus={booking.attendance_logs?.[0]?.status}
+                  initialStatus={attendance?.status}
+                />
+                <ManualCheckoutControl
+                  bookingId={booking.id}
+                  initialCheckInAt={attendance?.check_in_at?.toISOString() ?? null}
+                  initialCheckOutAt={attendance?.check_out_at?.toISOString() ?? null}
                 />
                 <ManualHoursRecorder
-                  volunteerId={participant?.id ?? ""}
+                  volunteerId={booking.volunteer_id}
                   opportunityId={opportunityId}
+                />
+                <HoursOverrideControl
+                  bookingId={booking.id}
+                  volunteerId={booking.volunteer_id}
+                  opportunityId={opportunityId}
+                  currentHours={currentHours}
+                  hoursOverride={hoursOverride}
                 />
               </article>
             );

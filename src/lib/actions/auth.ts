@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
+import { getDashboardPath } from "@/lib/role-routing";
 
 function authErrorMessage(error: { message?: string; status?: number }) {
   const message = error.message?.trim();
@@ -25,7 +26,7 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -39,7 +40,28 @@ export async function signIn(formData: FormData) {
     redirect(`/login?${params}`);
   }
 
-  redirect("/volunteer/dashboard");
+  let role: string | null = null;
+  try {
+    const profile = await prisma.profile.findUnique({
+      where: { id: data.user.id },
+      select: { role: true },
+    });
+    role = profile?.role ?? null;
+  } catch (lookupError) {
+    console.error("Sign-in profile lookup failed, falling back to Supabase", lookupError);
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    role = profile?.role ?? null;
+  }
+
+  const dashboardPath = getDashboardPath(role);
+  if (!dashboardPath) {
+    redirect(`/login?error=${encodeURIComponent("Your account role could not be determined. Please contact support.")}`);
+  }
+  redirect(dashboardPath);
 }
 
 export async function signUp(formData: FormData) {

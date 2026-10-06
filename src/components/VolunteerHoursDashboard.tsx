@@ -12,6 +12,7 @@ type HoursEntry = {
   hours: number;
   status: string;
   source: "attendance" | "manual";
+  hoursOverridden?: boolean;
   notes: string | null;
 };
 
@@ -124,7 +125,7 @@ export function VolunteerHoursDashboard() {
     try {
       channel = new BroadcastChannel("attendance-updates");
       channel.onmessage = (event) => {
-        if (event.data?.type === "attendance-update" || event.data?.type === "hours-recorded") {
+        if (event.data?.type === "attendance-update" || event.data?.type === "hours-recorded" || event.data?.type === "hours-overridden") {
           fetchHours();
         }
       };
@@ -262,6 +263,7 @@ export function VolunteerHoursDashboard() {
                   <div>
                     <h3 className="font-semibold">{entry.opportunityTitle}</h3>
                     <p className="text-xs capitalize text-slate-500">{entry.source} hours</p>
+                    {entry.hoursOverridden && <p className="text-xs font-medium text-emerald-700">Hours adjusted by the organization</p>}
                   </div>
                   <span className="font-medium text-emerald-700">{entry.hours.toFixed(2)} hours</span>
                 </div>

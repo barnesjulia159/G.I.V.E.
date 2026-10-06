@@ -6,6 +6,7 @@ import { signOut } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Opportunity, Organization } from "@/lib/types";
 import { NotificationBell } from "@/components/NotificationBell";
+import { LiveSignupCount, LiveSignupCounts } from "@/components/LiveSignupCounts";
 
 type NonprofitDashboardPageProps = {
   searchParams: Promise<{
@@ -149,6 +150,14 @@ async function NonprofitDashboardContent({
             aria-label="Your opportunities table"
             tabIndex={0}
           >
+            <LiveSignupCounts
+              initialCounts={Object.fromEntries(
+                activeOpportunities.map((opportunity) => [
+                  opportunity.id,
+                  opportunity.bookings?.filter((booking) => booking.status !== "cancelled").length ?? 0,
+                ])
+              )}
+            >
             <table className="opportunities-table text-sm">
               <colgroup>
                 <col className="w-[20%]" />
@@ -184,11 +193,7 @@ async function NonprofitDashboardContent({
                       {opportunity.status}
                     </td>
                     <td className="px-4 py-3">{opportunity.capacity}</td>
-                    <td className="px-4 py-3">
-                      {opportunity.bookings?.filter(
-                        (booking) => booking.status !== "cancelled"
-                      ).length ?? 0}
-                    </td>
+                    <LiveSignupCount opportunityId={opportunity.id} />
                     <td className="px-4 py-3">
                       {opportunity.bookings?.filter(
                         (booking) =>
@@ -220,20 +225,19 @@ async function NonprofitDashboardContent({
                             Archive
                           </SubmitButton>
                         </form>
-                        {opportunity.status === "published" && (
-                          <Link
-                            href={`/nonprofit/opportunities/${opportunity.id}/participants`}
-                            className="rounded-md border border-slate-300 px-3 py-2 text-slate-800 hover:bg-slate-100"
-                          >
-                            Participants
-                          </Link>
-                        )}
+                        <Link
+                          href={`/nonprofit/opportunities/${opportunity.id}/participants`}
+                          className="rounded-md border border-slate-300 px-3 py-2 text-slate-800 hover:bg-slate-100"
+                        >
+                          Participants
+                        </Link>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </LiveSignupCounts>
           </div>
         )}
       </div>
