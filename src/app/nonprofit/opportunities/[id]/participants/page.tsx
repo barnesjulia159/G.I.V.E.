@@ -4,6 +4,7 @@ import { AttendanceRecorder } from "@/components/AttendanceRecorder";
 import { ManualCheckoutControl } from "@/components/ManualCheckoutControl";
 import { HoursOverrideControl } from "@/components/HoursOverrideControl";
 import { ManualHoursRecorder } from "@/components/ManualHoursRecorder";
+import { LiveParticipants } from "@/components/LiveParticipants";
 import { RoleGate } from "@/components/RoleGate";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
@@ -99,6 +100,7 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
 
   return (
     <section className="mx-auto max-w-4xl">
+      <LiveParticipants />
       <Link href="/nonprofit/dashboard" className="text-sm font-medium text-emerald-700 hover:underline">
         Back to dashboard
       </Link>

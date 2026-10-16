@@ -98,7 +98,7 @@ export default async function OpportunitiesPage({
       {error && <p className="alert-error mb-4">{error.message}</p>}
       {filterError && <p className="alert-error mb-4">Filters could not be loaded. Please try again.</p>}
 
-      <form className="mb-8 grid grid-cols-1 gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-2">
+      <form className="opportunity-filters mb-8 grid grid-cols-1 gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-2">
         <div className="form-field">
           <label htmlFor="search" className="form-label">
             Search

@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Technical Documentation
+
+See the [technical stack and process flow determination](.github/modernize/assessment/engines/facts/business-workflows.md) for the as-built architecture, role-based workflows, sequence diagrams, business rules, and open verification items.
+
 ## Getting Started
 
 First, run the development server:

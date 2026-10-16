@@ -48,6 +48,31 @@ select {
   outline-offset: 2px;
 }
 
+.opportunity-filters {
+  padding: 1.25rem;
+}
+
+.opportunity-filters .form-input {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+}
+
+.opportunity-filters summary {
+  padding: 0.625rem 0.75rem;
+}
+
+.opportunity-filters details > div {
+  padding: 0.5rem 0.75rem;
+}
+
+.opportunity-filters details label {
+  padding: 0.375rem 0.25rem;
+}
+
+.opportunity-filters :is(button, a) {
+  padding: 0.625rem 1rem;
+}
+
 .alert-info {
   border-radius: 0.5rem;
   border: 1px solid #93c5fd;
