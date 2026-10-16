@@ -75,6 +75,9 @@ export async function AppHeader() {
                 <Link href="/nonprofit/dashboard" className={navLinkClass}>
                   Nonprofit Dashboard
                 </Link>
+                <Link href="/nonprofit/reports" className={navLinkClass}>
+                  Tracking &amp; Reports
+                </Link>
                 <Link href="/nonprofit/opportunities/new" className={navLinkClass}>
                   Post Opportunity
                 </Link>

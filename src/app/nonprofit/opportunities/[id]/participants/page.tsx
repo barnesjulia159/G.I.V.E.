@@ -107,6 +107,9 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
       <div className="mt-4 rounded-xl bg-white p-6 shadow-sm">
         <h1 className="text-3xl font-bold">Participants</h1>
         <p className="mt-2 text-slate-700">{opportunity.title}</p>
+        <Link href={`/nonprofit/reports?event=${opportunityId}`} className="text-sm font-medium text-emerald-700 hover:underline">
+          View event report
+        </Link>
       </div>
 
       <div className="mt-6 space-y-3">

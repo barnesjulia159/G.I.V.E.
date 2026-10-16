@@ -122,6 +122,13 @@ async function NonprofitDashboardContent({
           </Link>
 
           <Link
+            href="/nonprofit/reports"
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-100"
+          >
+            Tracking &amp; Reports
+          </Link>
+
+          <Link
             href="/nonprofit/organization"
             className="rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-100"
           >

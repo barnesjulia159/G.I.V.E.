@@ -11,6 +11,7 @@
     "prestart": "npm run native:sync",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-strip-types --test src/lib/event-report.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -22,6 +23,7 @@
     "expo": "^57.0.15",
     "expo-constants": "~57.0.13",
     "expo-notifications": "~57.0.13",
+    "lucide-react": "^1.58.0",
     "next": "16.2.10",
     "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
