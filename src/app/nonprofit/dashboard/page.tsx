@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Opportunity, Organization } from "@/lib/types";
 import { NotificationBell } from "@/components/NotificationBell";
 import { LiveSignupCount, LiveSignupCounts } from "@/components/LiveSignupCounts";
+import { formatDateTimeRange } from "@/lib/date-format";
 
 type NonprofitDashboardPageProps = {
   searchParams: Promise<{
@@ -194,7 +195,7 @@ async function NonprofitDashboardContent({
                       {opportunity.title}
                     </td>
                     <td className="px-4 py-3">
-                      {new Date(opportunity.start_at).toLocaleDateString()}
+                      {formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
                     </td>
                     <td className="px-4 py-3 capitalize">
                       {opportunity.status}

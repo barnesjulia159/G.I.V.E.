@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/date-format";
 import { prisma } from "@/lib/prisma";
 import {
   updateVolunteerAvailability,
@@ -41,14 +42,6 @@ function formatLabel(value: string) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
 }
 
 export async function generateMetadata(): Promise<Metadata> {

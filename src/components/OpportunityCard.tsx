@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { PublicOpportunityListing } from "@/lib/types";
+import { formatDateTimeRange } from "@/lib/date-format";
 
 type OpportunityCardProps = {
   opportunity: PublicOpportunityListing;
 };
 
 export function OpportunityCard({ opportunity }: OpportunityCardProps) {
-  const startDate = new Date(opportunity.start_at);
-
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
       <div className="mb-4">
@@ -26,7 +25,7 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
 
       <div className="mt-4 space-y-1 text-sm text-slate-600">
         <p>
-          <strong>Date:</strong> {startDate.toLocaleDateString()}
+          <strong>Date:</strong> {formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
         </p>
         <p>
           <strong>Location:</strong>{" "}
@@ -37,7 +36,7 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
               "Location TBD"}
         </p>
         <p>
-          <strong>Spots remaining:</strong> {opportunity.spots_remaining}
+          <strong>{opportunity.spots_remaining === 1 ? "Spot" : "Spots"} remaining:</strong> {opportunity.spots_remaining}
         </p>
       </div>
 

@@ -5,13 +5,11 @@ import { buildEventReport } from "@/lib/event-report";
 import { prisma } from "@/lib/prisma";
 import { getDashboardPath } from "@/lib/role-routing";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate, formatDateTime, formatDateTimeRange } from "@/lib/date-format";
 import styles from "./reports.module.css";
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium", timeStyle: "short", timeZone: "UTC",
-});
 const hoursFormatter = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const formatDate = (date: Date | null) => date ? dateFormatter.format(date) : "Not recorded";
+const formatReportDateTime = (date: Date | null) => date ? formatDateTime(date) : "Not recorded";
 const formatStatus = (status: string) => status.replaceAll("_", " ");
 
 export default async function ReportsPage({ searchParams }: {
@@ -91,7 +89,7 @@ export default async function ReportsPage({ searchParams }: {
           <div>
             <label htmlFor="report-event">Event</label>
             <select id="report-event" name="event" defaultValue={event.id} key={event.id}>
-              {events.map((item) => <option key={item.id} value={item.id}>{item.title} ({item.start_at.toISOString().slice(0, 10)})</option>)}
+              {events.map((item) => <option key={item.id} value={item.id}>{item.title} ({formatDate(item.start_at)})</option>)}
             </select>
           </div>
           <button type="submit">View report</button>
@@ -102,9 +100,9 @@ export default async function ReportsPage({ searchParams }: {
       <div className={styles.eventHeader}>
         <p className={styles.organization}>{organization.name}</p>
         <h2>{event.title}</h2>
-        <p>{formatDate(event.start_at)} to {formatDate(event.end_at)} (UTC)</p>
+        <p>{formatDateTimeRange(event.start_at, event.end_at)}</p>
         <p>{event.is_virtual ? "Virtual event" : [event.location_name, event.city].filter(Boolean).join(", ") || "Location not specified"}</p>
-        <p className={styles.metadata}>Event status: {formatStatus(event.status)} | Generated {formatDate(new Date())} (UTC)</p>
+        <p className={styles.metadata}>Event status: {formatStatus(event.status)} | Generated {formatReportDateTime(new Date())}</p>
       </div>
 
       <dl className={styles.totals}>
@@ -137,8 +135,8 @@ export default async function ReportsPage({ searchParams }: {
                   )) : "Manual entry only"}</td>
                   <td>{row.sessions.length ? row.sessions.map((session) => (
                     <div key={session.id} className={styles.session}>
-                      <span>In: {formatDate(session.attendanceLog?.check_in_at ?? null)}</span>
-                      <span>Out: {formatDate(session.attendanceLog?.check_out_at ?? null)}</span>
+                        <span>In: {formatReportDateTime(session.attendanceLog?.check_in_at ?? null)}</span>
+                        <span>Out: {formatReportDateTime(session.attendanceLog?.check_out_at ?? null)}</span>
                     </div>
                   )) : "Not recorded"}</td>
                   <td>

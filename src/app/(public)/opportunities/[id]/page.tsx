@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PublicOpportunityListing } from "@/lib/types";
 import { createBooking } from "@/lib/actions/bookings";
 import { SubmitButton } from "@/components/SubmitButton";
+import { formatDateTimeRange } from "@/lib/date-format";
 
 type OpportunityDetailsPageProps = {
 	params: Promise<{
@@ -33,8 +34,6 @@ export default async function OpportunityDetailsPage({
 	}
 
 	const opportunity = data as PublicOpportunityListing;
-	const startDate = new Date(opportunity.start_at);
-	const endDate = new Date(opportunity.end_at);
 	const [{ data: opportunitySkills }, { data: opportunityCauses }] = await Promise.all([
 		supabase.from("opportunity_skills").select("skills(name)").eq("opportunity_id", id),
 		supabase.from("opportunity_causes").select("causes(name)").eq("opportunity_id", id),
@@ -104,8 +103,7 @@ export default async function OpportunityDetailsPage({
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Date</dt>
 							<dd>
-								{startDate.toLocaleDateString()} from {startDate.toLocaleTimeString()} to{" "}
-								{endDate.toLocaleTimeString()}
+								{formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
 							</dd>
 						</div>
 
@@ -128,7 +126,7 @@ export default async function OpportunityDetailsPage({
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Capacity</dt>
 							<dd>
-								{opportunity.spots_remaining} spots remaining out of {opportunity.capacity}
+								{opportunity.spots_remaining} {opportunity.spots_remaining === 1 ? "spot" : "spots"} remaining out of {opportunity.capacity}
 							</dd>
 						</div>
 

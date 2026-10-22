@@ -3,6 +3,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { archiveMessage } from "@/lib/actions/messages";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { formatDateTime } from "@/lib/date-format";
 
 type NotificationsPageProps = {
   searchParams: Promise<{ message?: string }>;
@@ -148,10 +149,7 @@ function MessageSection({ title, messages, showArchive = false }: MessageSection
               </div>
               <div className="mt-3 flex items-center justify-between gap-4">
                 <p className="text-xs text-slate-500">
-                  {new Intl.DateTimeFormat("en-US", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(notification.created_at)}
+                  {formatDateTime(notification.created_at)}
                 </p>
                 {showArchive && (
                   <form action={archiveMessage}>

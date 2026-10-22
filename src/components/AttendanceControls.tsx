@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Toast } from "@/components/Toast";
+import { formatDateTime } from "@/lib/date-format";
 
 type AttendanceRecord = {
   check_in_at: string | null;
@@ -96,8 +97,8 @@ export function AttendanceControls({ bookingId }: AttendanceControlsProps) {
       </div>
       {attendance && isCheckedIn && (
         <p className="mt-2 text-xs text-slate-500">
-          Checked in at {new Date(attendance.check_in_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-          {isCheckedOut && ` · checked out at ${new Date(attendance.check_out_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+          Checked in at {formatDateTime(attendance.check_in_at!)}
+          {isCheckedOut && ` · checked out at ${formatDateTime(attendance.check_out_at!)}`}
         </p>
       )}
     </div>

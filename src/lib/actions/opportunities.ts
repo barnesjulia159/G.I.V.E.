@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OpportunityStatus } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
+import {
+  hasMinimumOpportunityDescription,
+  hasValidOpportunityLocation,
+  MIN_OPPORTUNITY_DESCRIPTION_LENGTH,
+} from "@/lib/opportunity-validation";
+import { formatDate, formatDateTimeRange } from "@/lib/date-format";
 
 function getOpportunityPayload(formData: FormData, status: OpportunityStatus) {
   const startAt = String(formData.get("start_at") || "");
@@ -24,6 +30,7 @@ function getOpportunityPayload(formData: FormData, status: OpportunityStatus) {
     minimum_age: formData.get("minimum_age")
       ? Number(formData.get("minimum_age"))
       : null,
+    is_virtual: formData.get("is_virtual") === "true",
     accessibility_notes: String(formData.get("accessibility_notes") || "").trim(),
     requirements: String(formData.get("requirements") || "").trim(),
     status,
@@ -54,14 +61,9 @@ async function notifyVolunteersOfPublishedOpportunity({
 
     if (!volunteers.length) return true;
 
-    const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
-    const timeFormatter = new Intl.DateTimeFormat("en-US", { timeStyle: "short" });
-    const startDate = new Date(startAt);
-    const endDate = new Date(endAt);
     const message = [
       `${title} is now available to book.`,
-      `Date: ${dateFormatter.format(startDate)}`,
-      `Time: ${timeFormatter.format(startDate)} - ${timeFormatter.format(endDate)}`,
+      `Date and time: ${formatDateTimeRange(startAt, endAt)}`,
       `Location: ${location || "Location TBD"}`,
     ].join("\n");
 
@@ -115,6 +117,19 @@ export async function createOpportunity(formData: FormData) {
 
   if (!payload.title || !payload.description || !payload.start_at || !payload.end_at || payload.capacity <= 0) {
     redirect("/nonprofit/opportunities/new?error=Title, description, start time, end time, and capacity are required.");
+  }
+
+  if (status === "published" && !hasMinimumOpportunityDescription(payload.description)) {
+    redirect(`/nonprofit/opportunities/new?error=${encodeURIComponent(`Published opportunities need a description of at least ${MIN_OPPORTUNITY_DESCRIPTION_LENGTH} characters.`)}`);
+  }
+
+  if (status === "published" && !hasValidOpportunityLocation({
+    isVirtual: payload.is_virtual,
+    locationName: payload.location_name,
+    addressLine1: payload.address_line1,
+    city: payload.city,
+  })) {
+    redirect("/nonprofit/opportunities/new?error=Add a venue, street address, or city, or mark the event as remote before publishing.");
   }
 
   const skillIds = [...new Set(formData.getAll("skill_ids").map(String))];
@@ -186,6 +201,19 @@ export async function updateOpportunity(formData: FormData) {
 
   const payload = getOpportunityPayload(formData, status);
 
+  if (status === "published" && !hasMinimumOpportunityDescription(payload.description)) {
+    redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent(`Published opportunities need a description of at least ${MIN_OPPORTUNITY_DESCRIPTION_LENGTH} characters.`)}`);
+  }
+
+  if (status === "published" && !hasValidOpportunityLocation({
+    isVirtual: payload.is_virtual,
+    locationName: payload.location_name,
+    addressLine1: payload.address_line1,
+    city: payload.city,
+  })) {
+    redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent("Add a venue, street address, or city, or mark the event as remote before publishing.")}`);
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -223,8 +251,7 @@ export async function updateOpportunity(formData: FormData) {
     .join(", ");
   const dateChanged =
     previousOpportunity &&
-    new Date(previousOpportunity.start_at).toLocaleDateString() !==
-      new Date(payload.start_at).toLocaleDateString();
+    formatDate(previousOpportunity.start_at) !== formatDate(payload.start_at);
   const timeChanged =
     previousOpportunity &&
     (previousOpportunity.start_at !== payload.start_at ||
@@ -261,14 +288,9 @@ export async function updateOpportunity(formData: FormData) {
       ]
         .filter(Boolean)
         .join(" ");
-      const startDate = new Date(payload.start_at);
-      const endDate = new Date(payload.end_at);
-      const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
-      const timeFormatter = new Intl.DateTimeFormat("en-US", { timeStyle: "short" });
       const updatedDetails = [
         `${payload.title} has been updated. ${changes}`,
-        `Updated date: ${dateFormatter.format(startDate)}`,
-        `Updated time: ${timeFormatter.format(startDate)} - ${timeFormatter.format(endDate)}`,
+        `Updated date and time: ${formatDateTimeRange(payload.start_at, payload.end_at)}`,
         `Updated location: ${updatedLocation || "Location TBD"}`,
         "Please review your booking details and update your plans accordingly.",
       ].join("\n");

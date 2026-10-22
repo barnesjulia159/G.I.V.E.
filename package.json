@@ -11,7 +11,7 @@
     "prestart": "npm run native:sync",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/event-report.test.mjs",
+    "test": "node --experimental-strip-types --test src/lib/event-report.test.mjs src/lib/opportunity-validation.test.mjs src/lib/date-format.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

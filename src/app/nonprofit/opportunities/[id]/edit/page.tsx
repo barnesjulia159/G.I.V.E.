@@ -102,7 +102,7 @@ async function EditOpportunityContent({
 
         <div className="form-field">
           <label htmlFor="description" className="form-label">
-            Description
+            Description (at least 50 characters to publish)
           </label>
           <textarea
             id="description"
@@ -122,6 +122,7 @@ async function EditOpportunityContent({
               id="start_at"
               name="start_at"
               type="datetime-local"
+              step="60"
               required
               defaultValue={toDateTimeLocal(opportunity.start_at)}
               className="form-input"
@@ -136,6 +137,7 @@ async function EditOpportunityContent({
               id="end_at"
               name="end_at"
               type="datetime-local"
+              step="60"
               required
               defaultValue={toDateTimeLocal(opportunity.end_at)}
               className="form-input"
@@ -185,6 +187,11 @@ async function EditOpportunityContent({
             className="form-input"
           />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="is_virtual" value="true" defaultChecked={opportunity.is_virtual} />
+          Remote / virtual event
+        </label>
 
         <div className="form-field">
           <label htmlFor="address_line1" className="form-label">

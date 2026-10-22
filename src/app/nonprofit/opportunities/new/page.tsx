@@ -57,7 +57,7 @@ async function OpportunityForm({
 
       <div className="form-field">
         <label htmlFor="description" className="form-label">
-          Description
+          Description (at least 50 characters to publish)
         </label>
         <textarea
           id="description"
@@ -76,6 +76,7 @@ async function OpportunityForm({
             id="start_at"
             name="start_at"
             type="datetime-local"
+            step="60"
             required
             className="form-input"
           />
@@ -89,6 +90,7 @@ async function OpportunityForm({
             id="end_at"
             name="end_at"
             type="datetime-local"
+            step="60"
             required
             className="form-input"
           />
@@ -130,6 +132,11 @@ async function OpportunityForm({
         </label>
         <input id="location_name" name="location_name" className="form-input" />
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="is_virtual" value="true" />
+        Remote / virtual event
+      </label>
 
       <div className="form-field">
         <label htmlFor="address_line1" className="form-label">

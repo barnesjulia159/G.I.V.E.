@@ -5,6 +5,7 @@ import { cancelBooking } from "@/lib/actions/bookings";
 import { createClient } from "@/lib/supabase/server";
 import { BookingWithOpportunity } from "@/lib/types";
 import { AttendanceControls } from "@/components/AttendanceControls";
+import { formatDateTimeRange } from "@/lib/date-format";
 
 type VolunteerBookingsPageProps = {
   searchParams: Promise<{
@@ -117,7 +118,6 @@ async function VolunteerBookingsContent({
         <div className="space-y-4">
           {bookings.map((booking) => {
             const opportunity = booking.opportunities;
-            const startDate = opportunity ? new Date(opportunity.start_at) : null;
             const scheduleChanged = opportunity ? changedOpportunityIds.has(opportunity.id) : false;
 
             return (
@@ -131,7 +131,7 @@ async function VolunteerBookingsContent({
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    {opportunity && startDate ? (
+                    {opportunity ? (
                       <>
                         {scheduleChanged && (
                           <span className="mb-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
@@ -143,11 +143,7 @@ async function VolunteerBookingsContent({
                         </p>
                         <h2 className="text-2xl font-semibold">{opportunity.title}</h2>
                         <p className="mt-2 text-slate-700">
-                          {startDate.toLocaleDateString()} at{" "}
-                          {startDate.toLocaleTimeString([], {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
+                          {formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
                         </p>
                         <p className="text-slate-700">
                           {[opportunity.location_name, opportunity.city, opportunity.state]

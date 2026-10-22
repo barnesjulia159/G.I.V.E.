@@ -1,5 +1,6 @@
 import { RoleGate } from "@/components/RoleGate";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/date-format";
 import { Profile } from "@/lib/types";
 
 export default async function AdminUsersPage() {
@@ -72,7 +73,7 @@ async function AdminUsersContent() {
                 </td>
 
                 <td className="py-3 pr-4">
-                  {new Date(user.created_at).toLocaleDateString()}
+                  {formatDate(user.created_at)}
                 </td>
               </tr>
             ))}

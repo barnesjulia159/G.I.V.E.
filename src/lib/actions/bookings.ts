@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { sendBookingConfirmationEmail } from "@/lib/email";
+import { formatDateTimeRange } from "@/lib/date-format";
 
 export async function createBooking(formData: FormData) {
   const opportunityId = String(formData.get("opportunity_id") || "");
@@ -50,18 +51,13 @@ export async function createBooking(formData: FormData) {
     redirect(`/opportunities/${opportunityId}?error=${encodeURIComponent(error.message)}`);
   }
 
-  const startDate = new Date(opportunity.start_at);
-  const endDate = new Date(opportunity.end_at);
-  const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
-  const timeFormatter = new Intl.DateTimeFormat("en-US", { timeStyle: "short" });
   const location = opportunity.is_virtual
     ? "Virtual"
     : [opportunity.location_name, opportunity.city, opportunity.state].filter(Boolean).join(", ") ||
       "Location to be confirmed";
   const confirmationDetails = [
     `Your registration for ${opportunity.title} is confirmed.`,
-    `Date: ${dateFormatter.format(startDate)}`,
-    `Time: ${timeFormatter.format(startDate)} - ${timeFormatter.format(endDate)}`,
+    `Date and time: ${formatDateTimeRange(opportunity.start_at, opportunity.end_at)}`,
     `Location: ${location}`,
     opportunity.requirements ? `Requirements: ${opportunity.requirements}` : null,
     opportunity.accessibility_notes

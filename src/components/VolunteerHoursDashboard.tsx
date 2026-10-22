@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/date-format";
 
 type HoursEntry = {
   id: string;
@@ -160,7 +161,7 @@ export function VolunteerHoursDashboard() {
         <div className="text-sm text-slate-600">
           {lastUpdated ? (
             <>
-              Last updated: <span className="font-medium">{lastUpdated.toLocaleTimeString()}</span>
+              Last updated: <span className="font-medium">{formatDateTime(lastUpdated)}</span>
               {isRefreshing && <span className="ml-2 inline-block animate-spin">⟳</span>}
             </>
           ) : (
@@ -185,7 +186,7 @@ export function VolunteerHoursDashboard() {
               <div key={booking.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
                 <div>
                   <p className="font-medium text-slate-900">{booking.opportunityTitle}</p>
-                  <p className="text-sm text-slate-600">Checked in: {booking.checkInAt ? new Date(booking.checkInAt).toLocaleTimeString() : "—"}</p>
+                  <p className="text-sm text-slate-600">Checked in: {booking.checkInAt ? formatDateTime(booking.checkInAt) : "—"}</p>
                 </div>
                 <button
                   onClick={() => handleCheckOut(booking.id)}
