@@ -25,7 +25,7 @@ export default async function OpportunitiesPage({
   const selectedSkills = Array.isArray(params.skill) ? params.skill : params.skill ? [params.skill] : [];
   const selectedCauses = Array.isArray(params.cause) ? params.cause : params.cause ? [params.cause] : [];
 
-  const supabase = await createClient();
+  const supabase = await createClient({ noStore: true });
   const [{ data: skills, error: skillsError }, { data: causes, error: causesError }] = await Promise.all([
     supabase.from("skills").select("id, name").order("name"),
     supabase.from("causes").select("id, name").order("name"),

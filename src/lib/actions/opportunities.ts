@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { invalidateOpportunityViews } from "@/lib/opportunity-cache";
+import { requireNonprofitOrganization } from "@/lib/authorization";
 import { OpportunityStatus } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import {
@@ -86,28 +87,10 @@ async function notifyVolunteersOfPublishedOpportunity({
 }
 
 export async function createOpportunity(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user, organization } = await requireNonprofitOrganization();
 
   const submitAction = String(formData.get("submit_action") || "draft");
   const status: OpportunityStatus = submitAction === "publish" ? "published" : "draft";
-
-  const { data: organization, error: orgError } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (orgError || !organization) {
-    redirect("/nonprofit/organization?error=Create an organization profile before posting opportunities.");
-  }
 
   const payload = {
     ...getOpportunityPayload(formData, status),
@@ -115,7 +98,7 @@ export async function createOpportunity(formData: FormData) {
     created_by: user.id,
   };
 
-  if (!payload.title || !payload.description || !payload.start_at || !payload.end_at || payload.capacity <= 0) {
+  if (!payload.title || !payload.description || !payload.start_at || !payload.end_at || !Number.isSafeInteger(payload.capacity) || payload.capacity <= 0) {
     redirect("/nonprofit/opportunities/new?error=Title, description, start time, end time, and capacity are required.");
   }
 
@@ -153,6 +136,7 @@ export async function createOpportunity(formData: FormData) {
   }
 
   if (createdOpportunity) {
+    invalidateOpportunityViews(createdOpportunity.id);
     const [{ error: skillLinkError }, { error: causeLinkError }] = await Promise.all([
       skillIds.length
         ? supabase.from("opportunity_skills").insert(skillIds.map((skillId) => ({ opportunity_id: createdOpportunity.id, skill_id: skillId })))
@@ -185,6 +169,7 @@ export async function createOpportunity(formData: FormData) {
 }
 
 export async function updateOpportunity(formData: FormData) {
+  const { supabase, user, organization } = await requireNonprofitOrganization();
   const opportunityId = String(formData.get("opportunity_id") || "");
   const submitAction = String(formData.get("submit_action") || "draft");
 
@@ -201,6 +186,10 @@ export async function updateOpportunity(formData: FormData) {
 
   const payload = getOpportunityPayload(formData, status);
 
+  if (!Number.isSafeInteger(payload.capacity) || payload.capacity <= 0) {
+    redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=Capacity must be a positive integer.`);
+  }
+
   if (status === "published" && !hasMinimumOpportunityDescription(payload.description)) {
     redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent(`Published opportunities need a description of at least ${MIN_OPPORTUNITY_DESCRIPTION_LENGTH} characters.`)}`);
   }
@@ -214,31 +203,36 @@ export async function updateOpportunity(formData: FormData) {
     redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent("Add a venue, street address, or city, or mark the event as remote before publishing.")}`);
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: previousOpportunity } = await supabase
+  const { data: previousOpportunity, error: lookupError } = await supabase
     .from("opportunities")
     .select("id, title, status, start_at, end_at, location_name, city, state")
     .eq("id", opportunityId)
+    .eq("organization_id", organization.id)
+    .eq("is_deleted", false)
     .maybeSingle();
 
-  const { error } = await supabase
+  if (lookupError || !previousOpportunity) {
+    redirect("/nonprofit/dashboard?error=Opportunity not found or access denied.");
+  }
+
+  const { data: updatedOpportunity, error } = await supabase
     .from("opportunities")
     .update(payload)
-    .eq("id", opportunityId);
+    .eq("id", opportunityId)
+    .eq("organization_id", organization.id)
+    .eq("is_deleted", false)
+    .select("id, title, status, start_at, end_at, location_name, city, state")
+    .maybeSingle();
 
   if (error) {
     redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent(error.message)}`);
   }
+  if (!updatedOpportunity) {
+    redirect("/nonprofit/dashboard?error=Opportunity not found or access denied.");
+  }
+  invalidateOpportunityViews(updatedOpportunity.id);
 
-  const becamePublished = previousOpportunity?.status !== "published" && status === "published";
+  const becamePublished = previousOpportunity.status !== "published" && updatedOpportunity.status === "published";
   const previousLocation = [
     previousOpportunity?.location_name,
     previousOpportunity?.city,
@@ -246,37 +240,41 @@ export async function updateOpportunity(formData: FormData) {
   ]
     .filter(Boolean)
     .join(", ");
-  const updatedLocation = [payload.location_name, payload.city, payload.state]
+  const updatedLocation = [updatedOpportunity.location_name, updatedOpportunity.city, updatedOpportunity.state]
     .filter(Boolean)
     .join(", ");
   const dateChanged =
     previousOpportunity &&
-    formatDate(previousOpportunity.start_at) !== formatDate(payload.start_at);
+    formatDate(previousOpportunity.start_at) !== formatDate(updatedOpportunity.start_at);
   const timeChanged =
     previousOpportunity &&
-    (previousOpportunity.start_at !== payload.start_at ||
-      previousOpportunity.end_at !== payload.end_at);
+    (previousOpportunity.start_at !== updatedOpportunity.start_at ||
+      previousOpportunity.end_at !== updatedOpportunity.end_at);
   const locationChanged = previousLocation !== updatedLocation;
   const scheduleChanged =
     previousOpportunity?.status === "published" &&
-    status === "published" &&
+    updatedOpportunity.status === "published" &&
     (dateChanged || timeChanged || locationChanged);
 
   if (becamePublished) {
     const notified = await notifyVolunteersOfPublishedOpportunity({
       senderId: user.id,
       opportunityId,
-      title: payload.title,
-      startAt: payload.start_at,
-      endAt: payload.end_at,
-      location: [payload.location_name, payload.city, payload.state].filter(Boolean).join(", "),
+      title: updatedOpportunity.title,
+      startAt: updatedOpportunity.start_at,
+      endAt: updatedOpportunity.end_at,
+      location: updatedLocation,
     });
     if (!notified) {
       redirect("/nonprofit/dashboard?error=Opportunity published, but volunteer notifications could not be sent.");
     }
   } else if (scheduleChanged) {
     const bookings = await prisma.booking.findMany({
-      where: { opportunity_id: opportunityId, status: { not: "cancelled" } },
+      where: {
+        opportunity_id: opportunityId,
+        opportunity: { organization_id: organization.id, organization: { user_id: user.id } },
+        status: { not: "cancelled" },
+      },
       select: { volunteer_id: true },
     });
 
@@ -289,8 +287,8 @@ export async function updateOpportunity(formData: FormData) {
         .filter(Boolean)
         .join(" ");
       const updatedDetails = [
-        `${payload.title} has been updated. ${changes}`,
-        `Updated date and time: ${formatDateTimeRange(payload.start_at, payload.end_at)}`,
+        `${updatedOpportunity.title} has been updated. ${changes}`,
+        `Updated date and time: ${formatDateTimeRange(updatedOpportunity.start_at, updatedOpportunity.end_at)}`,
         `Updated location: ${updatedLocation || "Location TBD"}`,
         "Please review your booking details and update your plans accordingly.",
       ].join("\n");
@@ -313,25 +311,32 @@ export async function updateOpportunity(formData: FormData) {
 }
 
 export async function archiveOpportunity(formData: FormData) {
+  const { supabase, organization } = await requireNonprofitOrganization();
   const opportunityId = String(formData.get("opportunity_id") || "");
 
   if (!opportunityId) {
     redirect("/nonprofit/dashboard?error=Missing opportunity ID.");
   }
 
-  const supabase = await createClient();
-
-  const { error } = await supabase
+  const { data: archivedOpportunity, error } = await supabase
     .from("opportunities")
     .update({
       status: "archived",
       is_deleted: true,
     })
-    .eq("id", opportunityId);
+    .eq("id", opportunityId)
+    .eq("organization_id", organization.id)
+    .eq("is_deleted", false)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     redirect(`/nonprofit/dashboard?error=${encodeURIComponent(error.message)}`);
   }
+  if (!archivedOpportunity) {
+    redirect("/nonprofit/dashboard?error=Opportunity not found or access denied.");
+  }
+  invalidateOpportunityViews(archivedOpportunity.id);
 
   redirect("/nonprofit/dashboard?message=Opportunity archived.");
 }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus } from "@/lib/types";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole, managedOpportunityScope } from "@/lib/access-control";
 
 const ATTENDANCE_STATUSES: AttendanceStatus[] = [
   "present",
@@ -33,18 +35,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "A valid attendance status is required" }, { status: 400 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getActiveProfile(user.id);
 
-  if (profile?.role !== "admin" && profile?.role !== "nonprofit") {
+  if (!profile || !isActiveRole(profile, ["admin", "nonprofit"])) {
     return NextResponse.json({ message: "Only organizers and administrators can record attendance" }, { status: 403 });
   }
 
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, opportunity: managedOpportunityScope(profile) },
     select: {
       id: true,
       status: true,

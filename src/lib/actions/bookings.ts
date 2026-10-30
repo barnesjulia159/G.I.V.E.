@@ -1,27 +1,19 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireActionAccount } from "@/lib/authorization";
 import { prisma } from "@/lib/prisma";
 import { sendBookingConfirmationEmail } from "@/lib/email";
 import { formatDateTimeRange } from "@/lib/date-format";
+import { invalidateOpportunityViews } from "@/lib/opportunity-cache";
 
 export async function createBooking(formData: FormData) {
+  const { supabase, user } = await requireActionAccount("volunteer");
   const opportunityId = String(formData.get("opportunity_id") || "");
   const notes = String(formData.get("notes") || "").trim();
 
   if (!opportunityId) {
     redirect("/opportunities?error=Missing opportunity ID.");
-  }
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
   }
 
   const { data: opportunity, error: opportunityError } = await supabase
@@ -30,6 +22,8 @@ export async function createBooking(formData: FormData) {
       "id, title, organization_id, start_at, end_at, location_name, city, state, is_virtual, requirements, accessibility_notes"
     )
     .eq("id", opportunityId)
+    .eq("status", "published")
+    .eq("is_deleted", false)
     .maybeSingle();
 
   if (opportunityError || !opportunity) {
@@ -50,6 +44,10 @@ export async function createBooking(formData: FormData) {
   if (error) {
     redirect(`/opportunities/${opportunityId}?error=${encodeURIComponent(error.message)}`);
   }
+  if (!booking) {
+    redirect(`/opportunities/${opportunityId}?error=Booking could not be confirmed.`);
+  }
+  invalidateOpportunityViews(opportunityId);
 
   const location = opportunity.is_virtual
     ? "Virtual"
@@ -134,25 +132,32 @@ export async function createBooking(formData: FormData) {
 }
 
 export async function cancelBooking(formData: FormData) {
+  const { supabase, user } = await requireActionAccount("volunteer");
   const bookingId = String(formData.get("booking_id") || "");
 
   if (!bookingId) {
     redirect("/volunteer/bookings?error=Missing booking ID.");
   }
 
-  const supabase = await createClient();
-
-  const { error } = await supabase
+  const { data: booking, error } = await supabase
     .from("bookings")
     .update({
       status: "cancelled",
       cancelled_at: new Date().toISOString(),
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("volunteer_id", user.id)
+    .in("status", ["booked", "waitlisted"])
+    .select("id, opportunity_id")
+    .maybeSingle();
 
   if (error) {
     redirect(`/volunteer/bookings?error=${encodeURIComponent(error.message)}`);
   }
+  if (!booking) {
+    redirect("/volunteer/bookings?error=Active booking not found or access denied.");
+  }
+  invalidateOpportunityViews(booking.opportunity_id);
 
   redirect("/volunteer/bookings?message=Booking cancelled.");
 }

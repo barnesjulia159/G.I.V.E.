@@ -59,7 +59,10 @@ export default async function ReportsPage({ searchParams }: {
 
   const [bookings, manualEntries] = await Promise.all([
     prisma.booking.findMany({
-      where: { opportunity_id: event.id, status: { not: "cancelled" } },
+      where: {
+        opportunity_id: event.id, opportunity: { organization: { user_id: user.id } },
+        status: { not: "cancelled" },
+      },
       orderBy: { booked_at: "asc" },
       select: {
         id: true, volunteer_id: true, status: true, hours_override: true, hours_override_notes: true, notes: true,
@@ -67,7 +70,8 @@ export default async function ReportsPage({ searchParams }: {
       },
     }),
     prisma.volunteer_hours.findMany({
-      where: { opportunity_id: event.id }, select: { volunteer_id: true, hours: true, notes: true },
+      where: { opportunity_id: event.id, opportunities: { organization: { user_id: user.id } } },
+      select: { volunteer_id: true, hours: true, notes: true },
     }),
   ]);
   const volunteerIds = [...new Set([...bookings, ...manualEntries].map((entry) => entry.volunteer_id))];

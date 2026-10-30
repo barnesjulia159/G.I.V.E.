@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { RoleGate } from "@/components/RoleGate";
 import { SubmitButton } from "@/components/SubmitButton";
 import { updateOpportunity } from "@/lib/actions/opportunities";
-import { createClient } from "@/lib/supabase/server";
+import { requireNonprofitOrganization } from "@/lib/authorization";
 import { Opportunity } from "@/lib/types";
 
 type EditOpportunityPageProps = {
@@ -35,12 +35,14 @@ async function EditOpportunityContent({
   id: string;
   error?: string;
 }) {
-  const supabase = await createClient();
+  const { supabase, organization } = await requireNonprofitOrganization();
 
   const { data } = await supabase
     .from("opportunities")
     .select("*")
     .eq("id", id)
+    .eq("organization_id", organization.id)
+    .eq("is_deleted", false)
     .maybeSingle();
 
   if (!data) {

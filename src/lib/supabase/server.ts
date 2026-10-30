@@ -8,13 +8,19 @@ function getSupabaseKey() {
   );
 }
 
-export async function createClient() {
+export async function createClient({ noStore = false }: { noStore?: boolean } = {}) {
   const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     getSupabaseKey()!,
     {
+      ...(noStore ? {
+        global: {
+          fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+            fetch(input, { ...init, cache: "no-store" }),
+        },
+      } : {}),
       cookies: {
         getAll() {
           return cookieStore.getAll();

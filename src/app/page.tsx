@@ -14,7 +14,7 @@ export default function HomePage() {
             alt="GIVE"
             priority
           />
-          <p className="home-eyebrow">GET INVOLVED. VOLUNTEER EASILY.</p>
+          <p className="home-eyebrow">GET INVOLVED. VOLUNTEER EASY.</p>
         </div>
 
         <h1>Find meaningful ways to serve your community.</h1>

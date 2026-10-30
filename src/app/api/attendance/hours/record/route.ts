@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole, managedOpportunityScope } from "@/lib/access-control";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -24,18 +26,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Hours must be greater than 0 and no more than 24" }, { status: 400 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getActiveProfile(user.id);
 
-  if (profile?.role !== "admin" && profile?.role !== "nonprofit") {
+  if (!profile || !isActiveRole(profile, ["admin", "nonprofit"])) {
     return NextResponse.json({ message: "Only organizers and administrators can record hours" }, { status: 403 });
   }
 
-  const opportunity = await prisma.opportunity.findUnique({
-    where: { id: opportunityId },
+  const opportunity = await prisma.opportunity.findFirst({
+    where: { id: opportunityId, ...managedOpportunityScope(profile) },
     select: { organization: { select: { user_id: true } } },
   });
 
@@ -44,7 +42,10 @@ export async function POST(request: Request) {
   }
 
   const participant = await prisma.booking.findFirst({
-    where: { opportunity_id: opportunityId, volunteer_id: volunteerId, status: { not: "cancelled" } },
+    where: {
+      opportunity_id: opportunityId, volunteer_id: volunteerId,
+      opportunity: managedOpportunityScope(profile), status: { not: "cancelled" },
+    },
     select: { id: true },
   });
 

@@ -7,7 +7,7 @@ import { ManualHoursRecorder } from "@/components/ManualHoursRecorder";
 import { LiveParticipants } from "@/components/LiveParticipants";
 import { RoleGate } from "@/components/RoleGate";
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase/server";
+import { requireNonprofitOrganization } from "@/lib/authorization";
 
 type ParticipantsPageProps = {
   params: Promise<{ id: string }>;
@@ -30,28 +30,22 @@ export default async function ParticipantsPage({ params }: ParticipantsPageProps
 }
 
 async function ParticipantsContent({ opportunityId }: { opportunityId: string }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: organization } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("user_id", user!.id)
-    .maybeSingle();
+  const { supabase, organization, user } = await requireNonprofitOrganization();
 
   const { data: opportunity } = await supabase
     .from("opportunities")
     .select("id, title")
     .eq("id", opportunityId)
-    .eq("organization_id", organization?.id ?? "")
+    .eq("organization_id", organization.id)
     .maybeSingle();
 
   if (!opportunity) notFound();
 
   const bookings = await prisma.booking.findMany({
-    where: { opportunity_id: opportunityId, status: { not: "cancelled" } },
+    where: {
+      opportunity_id: opportunityId, opportunity: { organization: { user_id: user.id } },
+      status: { not: "cancelled" },
+    },
     orderBy: { booked_at: "asc" },
     select: {
       id: true,
@@ -75,7 +69,10 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
   let hoursOverrides = new Map<string, number>();
   try {
     const overrides = await prisma.booking.findMany({
-      where: { opportunity_id: opportunityId, status: { not: "cancelled" }, hours_override: { not: null } },
+      where: {
+        opportunity_id: opportunityId, opportunity: { organization: { user_id: user.id } },
+        status: { not: "cancelled" }, hours_override: { not: null },
+      },
       select: { id: true, hours_override: true },
     });
     hoursOverrides = new Map(
@@ -87,7 +84,7 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
     console.error("Participant hours overrides could not be loaded:", error);
   }
   const manualHours = await prisma.volunteer_hours.findMany({
-    where: { opportunity_id: opportunityId },
+    where: { opportunity_id: opportunityId, opportunities: { organization: { user_id: user.id } } },
     select: { volunteer_id: true, hours: true },
   });
   const manualHoursByVolunteer = new Map<string, number>();

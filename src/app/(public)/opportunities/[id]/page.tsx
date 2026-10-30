@@ -21,13 +21,18 @@ export default async function OpportunityDetailsPage({
 }: OpportunityDetailsPageProps) {
 	const { id } = await params;
 	const { error } = await searchParams;
-	const supabase = await createClient();
+	const supabase = await createClient({ noStore: true });
 
-	const { data } = await supabase
+	const { data, error: opportunityError } = await supabase
 		.from("public_opportunity_listings")
 		.select("*")
 		.eq("id", id)
 		.maybeSingle();
+
+	if (opportunityError) {
+		console.error("Public opportunity lookup failed:", opportunityError);
+		throw new Error("Opportunity details could not be loaded.");
+	}
 
 	if (!data) {
 		notFound();

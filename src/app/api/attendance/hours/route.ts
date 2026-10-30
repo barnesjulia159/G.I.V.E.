@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole, managedOpportunityScope } from "@/lib/access-control";
 
 function calculateHours(checkIn: Date | null, checkOut: Date | null) {
   if (!checkIn || !checkOut || checkOut <= checkIn) return 0;
@@ -22,12 +24,11 @@ export async function GET(request: Request) {
   const opportunityId = url.searchParams.get("opportunityId");
   const targetUserId = requestedUserId || user.id;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  const isAdmin = profile?.role === "admin";
+  const profile = await getActiveProfile(user.id);
+  if (!profile) {
+    return NextResponse.json({ message: "An active account is required" }, { status: 403 });
+  }
+  const isAdmin = profile.role === "admin";
 
   if (requestedUserId && requestedUserId !== user.id && !isAdmin) {
     return NextResponse.json(
@@ -36,18 +37,14 @@ export async function GET(request: Request) {
     );
   }
 
-  if (opportunityId && !isAdmin) {
-    const { data: organization } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const { data: opportunity } = await supabase
-      .from("opportunities")
-      .select("id")
-      .eq("id", opportunityId)
-      .eq("organization_id", organization?.id ?? "")
-      .maybeSingle();
+  if (opportunityId) {
+    if (!isActiveRole(profile, ["admin", "nonprofit"])) {
+      return NextResponse.json({ message: "Only organizers can view event-wide hours" }, { status: 403 });
+    }
+    const opportunity = await prisma.opportunity.findFirst({
+      where: { id: opportunityId, ...managedOpportunityScope(profile) },
+      select: { id: true },
+    });
 
     if (!opportunity) {
       return NextResponse.json(
@@ -60,7 +57,7 @@ export async function GET(request: Request) {
   const [bookings, manualHours] = await Promise.all([
     prisma.booking.findMany({
       where: opportunityId
-        ? { opportunity_id: opportunityId, status: { not: "cancelled" } }
+        ? { opportunity_id: opportunityId, opportunity: managedOpportunityScope(profile), status: { not: "cancelled" } }
         : { volunteer_id: targetUserId, status: { not: "cancelled" } },
       orderBy: { booked_at: "desc" },
       include: {
@@ -70,7 +67,7 @@ export async function GET(request: Request) {
     }),
     prisma.volunteer_hours.findMany({
       where: opportunityId
-        ? { opportunity_id: opportunityId }
+        ? { opportunity_id: opportunityId, opportunities: managedOpportunityScope(profile) }
         : { volunteer_id: targetUserId },
       orderBy: { recorded_at: "desc" },
       include: { opportunities: { select: { title: true } } },

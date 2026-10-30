@@ -89,11 +89,11 @@ Evidence: [src/lib/actions/auth.ts](../../../../../src/lib/actions/auth.ts), [sr
 ### Workflow 2: Organization Setup and Opportunity Publication
 
 1. Nonprofit accesses its dashboard. Without an organization record, the UI directs it to create an organization profile.
-2. Opportunity creation resolves the organization by the authenticated user's ID and requires the core opportunity fields and positive capacity.
+2. Opportunity creation requires an active nonprofit, resolves the organization by the authenticated user's ID, and requires the core opportunity fields and positive capacity.
 3. Submission selects draft or published status and includes selected skill/cause associations.
 4. Publishing makes the opportunity eligible for the public listing view, subject to the view definition and RLS.
 5. Publication notification logic creates in-app records for active volunteer profiles. Notification failure is a separately handled side effect, not proof that publication was rolled back.
-6. Organizers can edit schedules and archive opportunities. The bookings page recognizes unread, unarchived `schedule_updated` notifications and highlights affected opportunities.
+6. Organizers can edit schedules and archive only their organization's opportunities. Mutations must return an affected row before success or notification side effects; schedule notifications use persisted values. The bookings page recognizes unread, unarchived `schedule_updated` notifications and highlights affected opportunities.
 7. The nonprofit dashboard retrieves signup counts through a non-cached API, scoped to the owner's non-deleted opportunities; counts exclude cancelled bookings.
 
 **Approval determination:** the checked-in removal migration makes approval automatic and removes approval checks from public listing/booking rules. Approval fields and older admin UI wording remain, so they must not be interpreted as an active mandatory approval stage.
@@ -103,14 +103,14 @@ Evidence: [src/lib/actions/opportunities.ts](../../../../../src/lib/actions/oppo
 ### Workflow 3: Discovery, Booking, and Cancellation
 
 1. Visitor browses the public opportunity listing, with keyword, city, date, skill, and cause filters. Invalid dates or unmatched taxonomy selections produce no matching results.
-2. Booking submission requires a signed-in user and a readable opportunity record.
-3. The server inserts a `booked` record through Supabase. Volunteer identity/role, opportunity eligibility, capacity, and uniqueness depend on database policy/function/index enforcement, not just form validation.
+2. Booking submission requires an active volunteer and a published, nondeleted opportunity record.
+3. The server derives the volunteer identity from the session and inserts a `booked` record through Supabase. Database policies, field-protection triggers, capacity locking, and the partial unique index independently enforce direct-client writes after the tenant-authorization migration is deployed.
 4. Once insertion succeeds, the action creates a volunteer confirmation notification and, when applicable, an organization-owner notification through Prisma.
 5. It attempts booking-confirmation email through Resend. Missing configuration skips email; provider errors are logged. Neither reverses the booking.
 6. The user is redirected to bookings. A notification-write failure can be shown alongside successful booking confirmation.
-7. Cancellation updates status and cancellation time through Supabase. The action filters by booking ID, so authorization relies on the deployed update policy.
+7. Cancellation updates status and cancellation time through Supabase, filtering by booking ID, current volunteer ID, and booked/waitlisted status. A zero-row mutation is rejected. Database policies and triggers prohibit changing reservation relationships or organizer-controlled fields.
 
-There is no booking RPC invocation in this action. Database validation is described by SQL trigger-function source; installed triggers and full policies were not inspected live.
+There is no booking RPC invocation in this action. The transactional-bookings migration was deployed and verified in remote migration history. The subsequent tenant-authorization migration and application checks have PostgreSQL RLS and handler regression tests; its remote deployment is a separate step.
 
 Evidence: [src/app/(public)/opportunities/page.tsx](../../../../../src/app/%28public%29/opportunities/page.tsx), [src/lib/actions/bookings.ts](../../../../../src/lib/actions/bookings.ts), and [src/lib/email.ts](../../../../../src/lib/email.ts).
 
@@ -221,10 +221,12 @@ sequenceDiagram
 | Rule | Determined Behavior | Enforcement / Qualification |
 | --- | --- | --- |
 | Public registration roles | Volunteer or nonprofit only | Auth server action; admin provisioning is outside this public flow. |
-| Protected page access | Authenticated user, existing active profile, allowed role | RoleGate; API authorization must be considered separately. |
+| Protected access | Authenticated user, existing active profile, allowed role | RoleGate on pages; explicit active-profile checks in opportunity/reservation actions and attendance/count APIs. |
+| Tenant scope | Organization owner, not merely opportunity creator | Application object predicates plus the tenant-authorization RLS migration; active admins retain explicit platform-wide privileges. |
+| Authorization attributes | Ordinary users cannot change role, activation, or approval | Profile protection trigger in the tenant-authorization migration; deployment required. |
 | Opportunity eligibility | Published, not deleted, future start for booking | Checked-in booking validation function; live attachment not verified. |
-| Capacity | Reject when active count reaches capacity | SQL function/policy; no explicit serialization lock appears in the inspected function, so concurrent capacity guarantees are not established. |
-| Active duplicate booking | Unique volunteer/opportunity pair for booked or waitlisted records | Partial unique index declared in Prisma schema; applied database state not verified. |
+| Capacity | Reject when booked count reaches capacity | The transactional-bookings migration locks the opportunity with `SELECT ... FOR UPDATE` before counting seats; requires `READ COMMITTED` writes. Applied database state not verified. |
+| Active duplicate booking | Unique volunteer/opportunity pair for booked or waitlisted records | Partial unique index declared in Prisma schema and enforced by the transactional-bookings migration; applied database state not verified. |
 | Approval | No mandatory administrator approval in removal migration | Older labels and schema defaults may not agree with migration intent. |
 | Self check-in | Owned booking, status booked, no previous check-in | Attendance route; no scheduled-time window is checked there. |
 | Self checkout | Owned attendance log, existing check-in, no checkout | Checkout route; does not independently re-check booking status. |
@@ -268,7 +270,7 @@ Evidence: [prisma.config.ts](../../../../../prisma.config.ts), [scripts/ensure-n
 1. **Established:** Next.js/React web application, hybrid Supabase/Prisma persistence, role-oriented workflows, database-assisted booking validation, and API-derived hours with overrides.
 2. **Approval drift:** Prisma organization default is false while the removal migration sets true; opportunity approval fields and legacy admin approval copy also remain. Confirm deployed behavior before treating approval as a business requirement.
 3. **Database completeness:** Verify deployed RLS, trigger attachments, partial indexes, required views, and migrations. Prisma schema alone does not capture all database behavior.
-4. **Concurrency:** Capacity checks and attendance read-then-write operations require concurrency testing; inspected source is not evidence of serialized admission or idempotent concurrent updates.
+4. **Concurrency:** Booking admission now has a row-locking migration and PostgreSQL contention tests; run them against a disposable database before deployment. Attendance read-then-write operations still require concurrency testing.
 5. **Hour accounting:** Manual entries recorded before checkout can remain additive after attendance completes unless an override suppresses them. Review this policy before using totals for formal reporting.
 6. **Security boundaries:** Verify direct database connection permissions and API active-account enforcement. RoleGate protects pages, not every direct database operation. The Prisma connection currently disables TLS certificate verification through `rejectUnauthorized: false`.
 7. **Delivery reliability:** Verify auth hook selection, sender/domain configuration, actual email delivery, and any intended push integration. No durable retry/outbox mechanism was established for booking side effects.

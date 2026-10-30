@@ -2,10 +2,12 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getDashboardPath } from "@/lib/role-routing";
+import { consumeLoginAttempt } from "@/lib/login-rate-limit";
 
 function authErrorMessage(error: { message?: string; status?: number }) {
   const message = error.message?.trim();
@@ -22,6 +24,17 @@ export async function signIn(formData: FormData) {
 
   if (!email || !password) {
     redirect("/login?error=Email and password are required.");
+  }
+
+  let limit;
+  try {
+    limit = await consumeLoginAttempt(email);
+  } catch (error) {
+    console.error("Login rate limit unavailable", error);
+    redirect("/login?error=Sign-in is temporarily unavailable. Please try again later.");
+  }
+  if (!limit.allowed) {
+    redirect(`/login?error=${encodeURIComponent(`Too many sign-in attempts. Try again in ${Math.ceil(limit.retry_after / 60)} minutes.`)}`);
   }
 
   const supabase = await createClient();
@@ -214,13 +227,26 @@ export async function updatePassword(formData: FormData) {
     redirect(`/reset-password?error=${encodeURIComponent(authErrorMessage(error))}`);
   }
 
-  await supabase.auth.signOut();
-  redirect("/login?message=Your password has been updated. Please log in.");
+  const { error: signOutError } = await supabase.auth.signOut({ scope: "global" });
+  revalidatePath("/", "layout");
+
+  if (signOutError) {
+    console.error("Global session invalidation failed after password update", signOutError);
+    redirect(`/login?error=${encodeURIComponent("Your password was updated, but we could not confirm sign-out on all devices. Sign in with your new password and try signing out again. Existing access tokens remain valid until they expire.")}`);
+  }
+
+  redirect(`/login?message=${encodeURIComponent("Your password has been updated and all refresh sessions have been signed out. Please log in. Existing access tokens remain valid until they expire.")}`);
 }
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  revalidatePath("/", "layout");
+
+  if (error) {
+    console.error("Global sign-out failed", error);
+    redirect(`/login?error=${encodeURIComponent("We could not confirm sign-out on all devices. Please sign in and try again.")}`);
+  }
 
   redirect("/");
 }

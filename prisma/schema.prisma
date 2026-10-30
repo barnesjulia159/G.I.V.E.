@@ -9,6 +9,16 @@ datasource db {
   schemas  = ["auth", "public"]
 }
 
+model LoginRateLimit {
+  key_hash   String   @id
+  attempts   Int
+  expires_at DateTime @db.Timestamptz(6)
+
+  @@index([expires_at], map: "login_rate_limits_expires_at_idx")
+  @@map("login_rate_limits")
+  @@schema("public")
+}
+
 model Organization {
   id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id           String        @unique(map: "organizations_user_unique") @db.Uuid

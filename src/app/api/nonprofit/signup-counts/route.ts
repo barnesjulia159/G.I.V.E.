@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole } from "@/lib/access-control";
 
 export async function GET() {
   const supabase = await createClient();
@@ -10,13 +12,9 @@ export async function GET() {
 
   if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getActiveProfile(user.id);
 
-  if (profile?.role !== "nonprofit") {
+  if (!isActiveRole(profile, ["nonprofit"])) {
     return NextResponse.json({ message: "Only nonprofit accounts can view signup counts" }, { status: 403 });
   }
 
@@ -31,6 +29,7 @@ export async function GET() {
       by: ["opportunity_id"],
       where: {
         opportunity_id: { in: opportunities.map(({ id }) => id) },
+        opportunity: { organization: { user_id: user.id } },
         status: { not: "cancelled" },
       },
       _count: { _all: true },

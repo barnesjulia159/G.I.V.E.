@@ -38,6 +38,10 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
           <p className="auth-overline">ACCOUNT RECOVERY</p>
           <h1>Reset password</h1>
           <p>Resetting the password for {user.email}.</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Updating your password signs out refresh sessions on all devices and requires a new login.
+            Existing access tokens remain valid until they expire.
+          </p>
         </header>
 
         {params.error && <p className="alert-error mt-4">{params.error}</p>}
