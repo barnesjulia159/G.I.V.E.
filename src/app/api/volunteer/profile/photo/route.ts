@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole } from "@/lib/access-control";
 
 const BUCKET = "profile-photos";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -46,6 +48,9 @@ export async function POST(request: Request) {
   const { supabase, user } = await getUserAndClient();
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!isActiveRole(await getActiveProfile(user.id), ["volunteer"])) {
+    return NextResponse.json({ message: "An active volunteer account is required" }, { status: 403 });
   }
 
   let file: unknown;
@@ -116,6 +121,9 @@ export async function DELETE() {
   const { supabase, user } = await getUserAndClient();
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!isActiveRole(await getActiveProfile(user.id), ["volunteer"])) {
+    return NextResponse.json({ message: "An active volunteer account is required" }, { status: 403 });
   }
 
   const { error: storageError } = await supabase.storage

@@ -2,10 +2,10 @@ import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
 import { SubmitButton } from "@/components/SubmitButton";
 import { cancelBooking } from "@/lib/actions/bookings";
-import { createClient } from "@/lib/supabase/server";
+import { requireActionAccount } from "@/lib/authorization";
 import { BookingWithOpportunity } from "@/lib/types";
 import { AttendanceControls } from "@/components/AttendanceControls";
-import { formatDateTimeRange } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type VolunteerBookingsPageProps = {
   searchParams: Promise<{
@@ -33,11 +33,7 @@ async function VolunteerBookingsContent({
   message?: string;
   error?: string;
 }) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const { data } = await supabase
     .from("bookings")
@@ -52,7 +48,7 @@ async function VolunteerBookingsContent({
       )
     `
     )
-    .eq("volunteer_id", user!.id)
+    .eq("volunteer_id", user.id)
     .neq("status", "cancelled")
     .order("booked_at", { ascending: false });
 
@@ -60,7 +56,7 @@ async function VolunteerBookingsContent({
   const { data: scheduleNotifications } = await supabase
     .from("notifications")
     .select("opportunity_id")
-    .eq("recipient_id", user!.id)
+    .eq("recipient_id", user.id)
     .eq("type", "schedule_updated")
     .eq("status", "sent")
     .is("read_at", null)
@@ -143,7 +139,7 @@ async function VolunteerBookingsContent({
                         </p>
                         <h2 className="text-2xl font-semibold">{opportunity.title}</h2>
                         <p className="mt-2 text-slate-700">
-                          {formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
+                          <LocalDateTime value={opportunity.start_at} end={opportunity.end_at} />
                         </p>
                         <p className="text-slate-700">
                           {[opportunity.location_name, opportunity.city, opportunity.state]

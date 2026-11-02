@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase/server";
+import { requireSignedInAccount } from "@/lib/authorization";
 
 export async function saveOrSendMessage(formData: FormData) {
   const recipientId = String(formData.get("recipient_id") || "").trim();
@@ -14,14 +14,7 @@ export async function saveOrSendMessage(formData: FormData) {
     redirect("/notifications/new?error=Recipient, subject, and message are required.");
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requireSignedInAccount(["volunteer", "nonprofit"]);
 
   const { data: sender } = await supabase
     .from("profiles")
@@ -32,6 +25,7 @@ export async function saveOrSendMessage(formData: FormData) {
     .from("profiles")
     .select("role")
     .eq("id", recipientId)
+    .eq("is_active", true)
     .maybeSingle();
 
   const senderRole = sender?.role;
@@ -74,14 +68,7 @@ export async function updateDraftMessage(formData: FormData) {
     redirect(`/notifications/${draftId}/edit?error=Subject and message are required.`);
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { user } = await requireSignedInAccount(["volunteer", "nonprofit"]);
 
   const draft = await prisma.notification.findFirst({
     where: { id: draftId, sender_id: user.id, status: "queued" },
@@ -106,12 +93,7 @@ export async function updateDraftMessage(formData: FormData) {
 
 export async function archiveMessage(formData: FormData) {
   const messageId = String(formData.get("message_id") || "").trim();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
+  const { user } = await requireSignedInAccount();
   if (!messageId) redirect("/notifications?message=Message not found.");
 
   const message = await prisma.notification.findFirst({

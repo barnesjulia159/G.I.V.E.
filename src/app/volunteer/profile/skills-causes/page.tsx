@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { VolunteerSkillsAndCausesEditor } from "@/components/VolunteerSkillsAndCausesEditor";
+import { requireActionAccount } from "@/lib/authorization";
 
-export default function VolunteerSkillsAndCausesPage() {
+export default async function VolunteerSkillsAndCausesPage() {
+  await requireActionAccount("volunteer");
   return (
     <section className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
       <div className="mb-6">

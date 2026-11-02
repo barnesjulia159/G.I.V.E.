@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
+import { isActiveRole } from "@/lib/access-control";
 
 type SkillsAndCauses = {
   skills: string[];
@@ -29,6 +31,9 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+  if (!isActiveRole(await getActiveProfile(user.id), ["volunteer"])) {
+    return NextResponse.json({ message: "An active volunteer account is required" }, { status: 403 });
+  }
 
   const profile = await prisma.profile.findUnique({
     where: { id: user.id },
@@ -39,7 +44,9 @@ export async function GET() {
     return NextResponse.json({ message: "Profile not found" }, { status: 404 });
   }
 
-  return NextResponse.json(parseSkillsAndCauses(profile.skillsAndCauses));
+  return NextResponse.json(parseSkillsAndCauses(profile.skillsAndCauses), {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -50,6 +57,9 @@ export async function PATCH(request: Request) {
 
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!isActiveRole(await getActiveProfile(user.id), ["volunteer"])) {
+    return NextResponse.json({ message: "An active volunteer account is required" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null);

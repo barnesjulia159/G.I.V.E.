@@ -49,6 +49,7 @@ export default async function OpportunitiesPage({
   let query = supabase
     .from("public_opportunity_listings")
     .select("*")
+    .gt("start_at", new Date().toISOString())
     .order("start_at", { ascending: true });
 
   if (search) {

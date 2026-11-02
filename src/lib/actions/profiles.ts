@@ -1,19 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireActionAccount } from "@/lib/authorization";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 
 export async function updateVolunteerProfile(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const profile = {
     first_name: String(formData.get("first_name") || "").trim(),
@@ -40,15 +32,7 @@ export async function updateVolunteerProfile(formData: FormData) {
 }
 
 export async function updateVolunteerContact(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const contact = {
     phone: String(formData.get("phone") || "").trim(),
@@ -70,15 +54,7 @@ export async function updateVolunteerContact(formData: FormData) {
 }
 
 export async function updateVolunteerBio(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const bio = String(formData.get("bio") || "").trim();
 
@@ -95,15 +71,7 @@ export async function updateVolunteerBio(formData: FormData) {
 }
 
 export async function updateVolunteerAvailability(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const availability = Object.fromEntries(
     AVAILABILITY_DAYS.map((day) => [

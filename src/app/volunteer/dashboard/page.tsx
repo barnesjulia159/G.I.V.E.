@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
-import { createClient } from "@/lib/supabase/server";
+import { requireActionAccount } from "@/lib/authorization";
 import { signOut } from "@/lib/actions/auth";
 import { AVAILABILITY_DAYS } from "@/lib/types";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -50,24 +50,20 @@ export default async function VolunteerDashboardPage() {
 }
 
 async function VolunteerDashboardContent() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await requireActionAccount("volunteer");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select(
       "display_name, first_name, bio, availability_notes, phone, city, state, zip_code, skillsAndCauses"
     )
-    .eq("id", user!.id)
+    .eq("id", user.id)
     .single();
 
   const { count: activeBookingCount } = await supabase
     .from("bookings")
     .select("*", { count: "exact", head: true })
-    .eq("volunteer_id", user!.id)
+    .eq("volunteer_id", user.id)
     .eq("status", "booked");
 
   const displayName =
@@ -92,7 +88,7 @@ async function VolunteerDashboardContent() {
           </p>
         </div>
         <div className="volunteer-dashboard-header-actions">
-          <NotificationBell />
+          <NotificationBell key={user.id} />
           <Link href="/opportunities" className="volunteer-dashboard-primary">
             Explore opportunities
           </Link>

@@ -32,6 +32,33 @@ keyboard-accessible menu below that breakpoint. Authentication screens stack bel
 901px; homepage actions and opportunity cards adapt to narrow mobile screens.
 Global resets rely on Tailwind Preflight so spacing and centering utilities work.
 
+## Local timezone display
+
+Event cards/details, dashboards, booking dates, attendance, reports, notifications,
+and profile dates display in the viewer's browser/operating-system timezone after
+hydration, including timezone abbreviations on times. Server HTML initially uses
+UTC to keep hydration deterministic; browsers with JavaScript disabled retain UTC.
+Ranges crossing daylight-saving changes label both offsets.
+
+Stored timestamps and the upcoming-opportunity cutoff remain absolute instants.
+Server-generated notification bodies and email timestamps stay explicitly labelled
+UTC because the recipient's browser timezone is not available to background work.
+This change does not alter event date entry or the date-search filter's UTC semantics.
+
+## Private volunteer accounts
+
+Personal notifications, bookings, dashboards, hours, and profile pages require a
+verified signed-in account; volunteer-only pages and profile updates additionally
+require an active volunteer role. Queries use the authenticated account ID, not a
+visitor-supplied volunteer ID. Notification and profile APIs reject signed-out or
+inactive accounts before accessing records.
+
+Private routes and APIs send `Cache-Control: private, no-store`. Session changes
+clear personalized UI and reload the page to discard cached navigation; background
+session checks also run on focus and every 30 seconds. Notification refresh failures
+clear previously loaded messages, including protection against stale in-flight
+responses. Public opportunity listings remain available without signing in.
+
 ## Transactional bookings
 
 Apply `supabase/migrations/20261029000000_transactional_bookings.sql` through
@@ -124,6 +151,11 @@ The RLS suite needs a test database owner able to create the `anon`/`authenticat
 test roles. Database suites are explicitly skipped when their variables are absent.
 
 ## Public search visibility and cache freshness
+
+The public opportunities list includes only events whose scheduled `start_at`
+is strictly later than the current server time. Started and past events disappear
+on the next page request or reload, including when search filters are used.
+Existing bookings, organizer records, and public detail URLs are retained.
 
 There is no asynchronous search index: keyword/filter search and public detail pages
 query the live `public_opportunity_listings` Supabase view. Its database predicate

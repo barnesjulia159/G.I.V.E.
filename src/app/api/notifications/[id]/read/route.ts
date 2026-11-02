@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
 
 export async function PATCH(
   _request: Request,
@@ -13,6 +14,9 @@ export async function PATCH(
 
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!await getActiveProfile(user.id)) {
+    return NextResponse.json({ message: "An active account is required" }, { status: 403 });
   }
 
   const { id } = await params;

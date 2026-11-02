@@ -3,7 +3,7 @@ import { AttendanceRecorder } from "@/components/AttendanceRecorder";
 import { ManualHoursRecorder } from "@/components/ManualHoursRecorder";
 import { createClient } from "@/lib/supabase/server";
 import { Booking, Opportunity, Organization, Profile } from "@/lib/types";
-import { formatDate, formatDateTimeRange } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type AdminBookingRow = Booking & {
   profiles: Pick<Profile, "display_name" | "first_name" | "last_name"> | null;
@@ -121,7 +121,7 @@ async function AdminBookingsContent() {
 
                   <td className="py-3 pr-4">
                     {opportunity?.start_at && opportunity.end_at
-                      ? formatDateTimeRange(opportunity.start_at, opportunity.end_at)
+                      ? <LocalDateTime value={opportunity.start_at} end={opportunity.end_at} />
                       : "N/A"}
                   </td>
 
@@ -136,7 +136,7 @@ async function AdminBookingsContent() {
                   <td className="py-3 pr-4 capitalize">{booking.status}</td>
 
                   <td className="py-3 pr-4">
-                    {formatDate(booking.booked_at)}
+                    <LocalDateTime value={booking.booked_at} dateOnly />
                   </td>
 
                   <td className="py-3 pr-4">

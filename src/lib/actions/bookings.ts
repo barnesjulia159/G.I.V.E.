@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireActionAccount } from "@/lib/authorization";
 import { prisma } from "@/lib/prisma";
 import { sendBookingConfirmationEmail } from "@/lib/email";
-import { formatDateTimeRange } from "@/lib/date-format";
+import { formatDateTime, formatDateTimeRange } from "@/lib/date-format";
 import { invalidateOpportunityViews } from "@/lib/opportunity-cache";
 
 export async function createBooking(formData: FormData) {
@@ -113,7 +113,7 @@ export async function createBooking(formData: FormData) {
             ? user.user_metadata.display_name
             : user.email,
         opportunityTitle: opportunity.title,
-        startAt: new Date(opportunity.start_at).toLocaleString(),
+        startAt: formatDateTime(opportunity.start_at),
         location:
           [opportunity.location_name, opportunity.city, opportunity.state]
             .filter(Boolean)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Toast } from "@/components/Toast";
-import { formatDateTime } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type AttendanceRecord = {
   check_in_at: string | null;
@@ -97,8 +97,8 @@ export function AttendanceControls({ bookingId }: AttendanceControlsProps) {
       </div>
       {attendance && isCheckedIn && (
         <p className="mt-2 text-xs text-slate-500">
-          Checked in at {formatDateTime(attendance.check_in_at!)}
-          {isCheckedOut && ` · checked out at ${formatDateTime(attendance.check_out_at!)}`}
+          Checked in at <LocalDateTime value={attendance.check_in_at!} />
+          {isCheckedOut && <> · checked out at <LocalDateTime value={attendance.check_out_at!} /></>}
         </p>
       )}
     </div>

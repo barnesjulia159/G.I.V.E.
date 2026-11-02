@@ -16,11 +16,11 @@ export async function AppHeader() {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", user.id)
       .single();
 
-    role = profile?.role ?? null;
+    role = profile?.is_active === true ? profile.role : null;
   }
 
   const navLinkClass = "text-sm font-medium text-slate-600 transition hover:text-teal-800";
@@ -45,7 +45,7 @@ export async function AppHeader() {
               Opportunities
             </Link>
 
-            {user && <NotificationBell />}
+            {user && role && <NotificationBell key={user.id} />}
 
             {role === "volunteer" && (
               <>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDateTime } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type HoursEntry = {
   id: string;
@@ -161,7 +161,7 @@ export function VolunteerHoursDashboard() {
         <div className="text-sm text-slate-600">
           {lastUpdated ? (
             <>
-              Last updated: <span className="font-medium">{formatDateTime(lastUpdated)}</span>
+              Last updated: <span className="font-medium"><LocalDateTime value={lastUpdated} /></span>
               {isRefreshing && <span className="ml-2 inline-block animate-spin">⟳</span>}
             </>
           ) : (
@@ -186,7 +186,7 @@ export function VolunteerHoursDashboard() {
               <div key={booking.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
                 <div>
                   <p className="font-medium text-slate-900">{booking.opportunityTitle}</p>
-                  <p className="text-sm text-slate-600">Checked in: {booking.checkInAt ? formatDateTime(booking.checkInAt) : "—"}</p>
+                  <p className="text-sm text-slate-600">Checked in: {booking.checkInAt ? <LocalDateTime value={booking.checkInAt} /> : "—"}</p>
                 </div>
                 <button
                   onClick={() => handleCheckOut(booking.id)}
@@ -270,11 +270,11 @@ export function VolunteerHoursDashboard() {
                 </div>
                 {entry.source === "attendance" ? (
                   <>
-                    <p className="mt-2 text-sm text-slate-600">Checked in: {entry.checkInAt ? new Date(entry.checkInAt).toLocaleString() : "Not checked in"}</p>
-                    <p className="text-sm text-slate-600">Checked out: {entry.checkOutAt ? new Date(entry.checkOutAt).toLocaleString() : "Not checked out"}</p>
+                    <p className="mt-2 text-sm text-slate-600">Checked in: {entry.checkInAt ? <LocalDateTime value={entry.checkInAt} /> : "Not checked in"}</p>
+                    <p className="text-sm text-slate-600">Checked out: {entry.checkOutAt ? <LocalDateTime value={entry.checkOutAt} /> : "Not checked out"}</p>
                   </>
                 ) : (
-                  <p className="mt-2 text-sm text-slate-600">Recorded: {new Date(entry.recordedAt).toLocaleString()}</p>
+                  <p className="mt-2 text-sm text-slate-600">Recorded: <LocalDateTime value={entry.recordedAt} /></p>
                 )}
                 {entry.notes && <p className="mt-2 text-sm text-slate-600">Note: {entry.notes}</p>}
               </article>

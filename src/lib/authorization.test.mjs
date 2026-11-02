@@ -395,7 +395,187 @@ test("action authorization rejects missing, inactive and wrong-role accounts", a
       } } } },
       "@/lib/access-control": accessControl,
     });
+
     await assert.rejects(auth.requireActionAccount("nonprofit"), (error) => error.location.startsWith("/login"));
+  }
+});
+
+test("private account guard accepts only verified active accounts with the required role", async () => {
+      for (const profile of [null,
+        { id: userId, role: "volunteer", isActive: false },
+        { id: userId, role: "nonprofit", isActive: true },
+        { id: userId, role: "volunteer", isActive: true },
+      ]) {
+        const auth = await loadServerModule("./authorization.ts", {
+          "next/navigation": navigation,
+          "@/lib/supabase/server": { createClient: async () => ({
+            auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
+          }) },
+          "@/lib/prisma": { prisma: { profile: { findUnique: async () => profile } } },
+          "@/lib/access-control": accessControl,
+        });
+        if (profile?.isActive && profile.role === "volunteer") {
+          assert.equal((await auth.requireActionAccount("volunteer")).user.id, userId);
+        } else {
+          await assert.rejects(auth.requireActionAccount("volunteer"), error => error.location.startsWith("/login"));
+        }
+      }
+    });
+
+    test("private notification and profile pages authorize before querying personal data", async () => {
+      for (const path of [
+        "../app/notifications/page.tsx", "../app/notifications/new/page.tsx",
+        "../app/notifications/[id]/edit/page.tsx", "../app/volunteer/profile/page.tsx",
+        "../app/volunteer/profile/skills-causes/page.tsx",
+      ]) {
+        const reject = async () => redirect("/login");
+        const handler = await loadServerModule(path, {
+          "react/jsx-runtime": {},
+          "next/navigation": { ...navigation, notFound: () => assert.fail("Unexpected data access") },
+          "next/link": {},
+          "@/components/SubmitButton": {},
+          "@/components/LocalDateTime": {},
+          "@/components/VolunteerSkillsAndCausesEditor": {},
+          "@/lib/actions/messages": {},
+          "@/lib/actions/profiles": {},
+          "@/lib/types": { AVAILABILITY_DAYS: [] },
+          "@/lib/authorization": { requireActionAccount: reject, requireSignedInAccount: reject },
+          "@/lib/prisma": { prisma: {} },
+        });
+        await assert.rejects(handler.default({ searchParams: Promise.resolve({}), params: Promise.resolve({ id: objectId }) }),
+          error => error.location === "/login");
+        if (handler.generateMetadata) {
+          await assert.rejects(handler.generateMetadata(), error => error.location === "/login");
+        }
+      }
+    });
+
+    test("notification reads and mutations remain scoped to the current account", async () => {
+      const queries = [];
+      const prisma = {
+        notification: {
+          findMany: args => { queries.push(args.where); return []; },
+          count: args => { queries.push(args.where); return 0; },
+          findFirst: async args => { queries.push(args.where); return null; },
+        },
+        $transaction: async promises => Promise.all(promises),
+      };
+      const imports = {
+        "next/server": nextServer,
+        "@/lib/supabase/server": { createClient: async () => ({
+          auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
+        }) },
+        "@/lib/authorization": { getActiveProfile: async () => ({ id: userId, role: "volunteer", isActive: true }) },
+        "@/lib/prisma": { prisma },
+      };
+      const list = await loadServerModule("../app/api/notifications/route.ts", imports);
+      const response = await list.GET(new Request(`http://localhost/api/notifications?recipientId=${objectId}`));
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+      assert.deepEqual(queries, [{ recipient_id: userId }, { recipient_id: userId }]);
+      const read = await loadServerModule("../app/api/notifications/[id]/read/route.ts", imports);
+      assert.equal((await read.PATCH(new Request("http://localhost", { method: "PATCH" }),
+        { params: Promise.resolve({ id: objectId }) })).status, 404);
+      assert.deepEqual(queries.at(-1), { id: objectId, recipient_id: userId });
+    });
+
+    test("session changes hide personalized UI and discard cached navigation", async () => {
+      const previousWindow = globalThis.window;
+      const handlers = new Map();
+      let effect;
+      let sessionCallback;
+      let reloads = 0;
+      let blocked = false;
+      let unsubscribed = false;
+      globalThis.window = {
+        location: { reload: () => reloads++ },
+        addEventListener: (name, handler) => handlers.set(name, handler),
+        removeEventListener: name => handlers.delete(name),
+        setInterval: () => 1,
+        clearInterval: () => {},
+      };
+      try {
+        const boundary = await loadServerModule("../components/AuthSessionBoundary.tsx", {
+          react: {
+            useState: () => [blocked, value => { blocked = value; }],
+            useEffect: callback => { effect = callback; },
+          },
+          "react/jsx-runtime": { jsx: () => "blocked" },
+          "@/lib/supabase/client": { createClient: () => ({ auth: {
+            onAuthStateChange: callback => {
+              sessionCallback = callback;
+              return { data: { subscription: { unsubscribe: () => { unsubscribed = true; } } } };
+            },
+            getUser: async () => ({ data: { user: null }, error: null }),
+          } }) },
+        });
+        assert.equal(boundary.AuthSessionBoundary({ userId, children: "personal data" }), "personal data");
+        const cleanup = effect();
+        sessionCallback("SIGNED_IN", { user: { id: userId } });
+        assert.equal(reloads, 0);
+        sessionCallback("SIGNED_OUT", null);
+        assert.equal(blocked, true);
+        assert.equal(reloads, 1);
+        sessionCallback("SIGNED_IN", { user: { id: objectId } });
+        assert.equal(reloads, 2);
+        await handlers.get("focus")();
+        assert.equal(reloads, 3);
+        cleanup();
+        assert.equal(unsubscribed, true);
+        assert.equal(handlers.size, 0);
+      } finally {
+        if (previousWindow === undefined) delete globalThis.window;
+        else globalThis.window = previousWindow;
+      }
+    });
+test("notification refresh rejection clears private data and older requests cannot restore it", async () => {
+  const previous = { fetch: globalThis.fetch, window: globalThis.window, document: globalThis.document };
+  const secret = { id: objectId, title: "Private message" };
+  const states = [true, [secret], 1, true, ""];
+  let stateIndex = 0;
+  let effect;
+  let refresh;
+  const pending = [];
+  let requests = 0;
+  globalThis.fetch = () => {
+    if (++requests <= 2) return new Promise(resolve => pending.push(resolve));
+    return Promise.resolve(Response.json({ message: "Unauthorized" }, { status: 401 }));
+  };
+  globalThis.document = { addEventListener() {}, removeEventListener() {} };
+  globalThis.window = {
+    addEventListener() {}, removeEventListener() {},
+    setInterval: callback => { refresh = callback; return 1; }, clearInterval() {},
+  };
+  try {
+    const component = await loadServerModule("../components/NotificationBell.tsx", {
+      "next/link": {},
+      "@/components/Toast": {},
+      "react/jsx-runtime": { jsx: () => null, jsxs: () => null },
+      react: {
+        useState: () => {
+          const index = stateIndex++;
+          return [states[index], value => { states[index] = value; }];
+        },
+        useRef: value => ({ current: value }),
+        useEffect: callback => { effect = callback; },
+      },
+    });
+    component.NotificationBell();
+    const cleanup = effect();
+    await refresh();
+    assert.deepEqual(states.slice(0, 4), [false, [], 0, false]);
+    assert.match(states[4], /signed in/);
+    pending[0](Response.json({ data: [secret] }));
+    pending[1](Response.json({ pagination: { total: 1 } }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(states[1], []);
+    assert.equal(states[2], 0);
+    cleanup();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    }
   }
 });
 
@@ -703,6 +883,7 @@ test("public listing and detail read the live visibility view without caching fo
     from(table) {
       const query = {
         select() { return query; }, order() { return query; }, eq() { return query; },
+        gt() { return query; },
         then(resolve, reject) {
           if (table !== "public_opportunity_listings") return Promise.resolve({ data: [], error: null }).then(resolve, reject);
           const visible = state.status === "published" && !state.is_deleted;
@@ -728,6 +909,7 @@ test("public listing and detail read the live visibility view without caching fo
     "@/components/OpportunityCard": {},
     "@/lib/actions/bookings": {},
     "@/components/SubmitButton": {},
+    "@/components/LocalDateTime": {},
     "@/lib/date-format": { formatDateTimeRange: () => "time" },
   };
   const listing = await loadServerModule("../app/(public)/opportunities/page.tsx", imports);
@@ -748,6 +930,64 @@ test("public listing and detail read the live visibility view without caching fo
   }
 });
 
+test("public discovery excludes past and exactly-started events while retaining future events", async () => {
+  const jsx = (type, props) => ({ type: typeof type === "string" ? type : "component", props });
+  let cutoff;
+  const before = Date.now();
+  const listing = await loadServerModule("../app/(public)/opportunities/page.tsx", {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "next/link": {},
+    "@/components/OpportunityCard": {},
+    "@/lib/supabase/server": { createClient: async (options) => {
+      assert.deepEqual(options, { noStore: true });
+      return { from(table) {
+        const query = {
+          select() { return query; }, order() { return query; },
+          gt(column, value) {
+            assert.equal(table, "public_opportunity_listings");
+            assert.equal(column, "start_at");
+            cutoff = Date.parse(value);
+            return query;
+          },
+          then(resolve, reject) {
+            const events = table === "public_opportunity_listings" ? [
+              { id: "past-event", start_at: cutoff - 1 },
+              { id: "started-event", start_at: cutoff },
+              { id: "future-event", start_at: cutoff + 1 },
+            ].filter((event) => event.start_at > cutoff) : [];
+            return Promise.resolve({ data: events, error: null }).then(resolve, reject);
+          },
+        };
+        return query;
+      } };
+    } },
+  });
+  const rendered = JSON.stringify(await listing.default({ searchParams: Promise.resolve({}) }));
+  assert.ok(cutoff >= before && cutoff <= Date.now());
+  assert.ok(rendered.includes("future-event"));
+  assert.ok(!rendered.includes("past-event"));
+  assert.ok(!rendered.includes("started-event"));
+});
+
+test("local time display uses browser timezone and a deterministic UTC hydration fallback", async () => {
+  const format = await import("./date-format.ts");
+  let hydrated = false;
+  const display = await loadServerModule("../components/LocalDateTime.tsx", {
+    react: { useSyncExternalStore: (_subscribe, getSnapshot, getServerSnapshot) => {
+      assert.equal(getServerSnapshot(), "UTC");
+      return hydrated ? "America/New_York" : getServerSnapshot();
+    } },
+    "@/lib/date-format": format,
+  });
+  const value = "2026-11-05T01:00:00Z";
+  assert.equal(display.LocalDateTime({ value }), "November 5, 2026, 1:00 AM UTC");
+  hydrated = true;
+  assert.equal(display.LocalDateTime({ value }), "November 4, 2026, 8:00 PM EST");
+  assert.equal(display.LocalDateTime({ value, dateOnly: true }), "November 4, 2026");
+  assert.equal(display.LocalDateTime({ value, end: "2026-11-05T02:00:00Z" }),
+    "November 4, 2026, 8:00 PM-9:00 PM EST");
+});
+
 const routeCases = [
   ["../app/api/attendance/record/route.ts", "POST", { bookingId: objectId, status: "present" }],
   ["../app/api/attendance/manual-checkout/route.ts", "PATCH", {
@@ -759,6 +999,13 @@ const routeCases = [
   ["../app/api/attendance/check-out/route.ts", "POST", { bookingId: objectId }],
   ["../app/api/attendance/hours/route.ts", "GET", null],
   ["../app/api/nonprofit/signup-counts/route.ts", "GET", null],
+  ["../app/api/notifications/route.ts", "GET", null],
+  ["../app/api/notifications/route.ts", "POST", { title: "Test", message: "Test" }],
+  ["../app/api/notifications/[id]/read/route.ts", "PATCH", null],
+  ["../app/api/volunteer/profile/skills-causes/route.ts", "GET", null],
+  ["../app/api/volunteer/profile/skills-causes/route.ts", "PATCH", { skills: [], causes: [] }],
+  ["../app/api/volunteer/profile/photo/route.ts", "POST", null],
+  ["../app/api/volunteer/profile/photo/route.ts", "DELETE", null],
 ];
 
 for (const [path, method, body] of routeCases) {
@@ -773,7 +1020,7 @@ for (const [path, method, body] of routeCases) {
       });
       const response = await handler[method](new Request("http://localhost/api/test", {
         method, ...(body ? { body: JSON.stringify(body), headers: { "Content-Type": "application/json" } } : {}),
-      }));
+      }), { params: Promise.resolve({ id: objectId }) });
       assert.equal(response.status, user ? 403 : 401);
     }
   });

@@ -12,7 +12,14 @@ export async function proxy(request: NextRequest) {
   if (request.method === "OPTIONS" && request.nextUrl.pathname.startsWith("/api/")) {
     return new NextResponse(null, { status: 204 });
   }
-  return updateSession(request);
+  const response = await updateSession(request);
+  const path = request.nextUrl.pathname;
+  if (["/volunteer", "/notifications", "/api/notifications", "/api/volunteer", "/api/attendance"].some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  )) {
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+  return response;
 }
 
 export const config = {

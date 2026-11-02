@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SubmitButton } from "@/components/SubmitButton";
 import { updateDraftMessage } from "@/lib/actions/messages";
-import { createClient } from "@/lib/supabase/server";
+import { requireSignedInAccount } from "@/lib/authorization";
 import { prisma } from "@/lib/prisma";
 
 type EditDraftPageProps = {
@@ -16,12 +16,7 @@ export default async function EditDraftPage({
 }: EditDraftPageProps) {
   const { id } = await params;
   const { error } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
+  const { user } = await requireSignedInAccount(["volunteer", "nonprofit"]);
 
   const draft = await prisma.notification.findFirst({
     where: { id, sender_id: user.id, status: "queued" },

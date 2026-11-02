@@ -5,11 +5,11 @@ import { buildEventReport } from "@/lib/event-report";
 import { prisma } from "@/lib/prisma";
 import { getDashboardPath } from "@/lib/role-routing";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatDateTime, formatDateTimeRange } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import styles from "./reports.module.css";
 
 const hoursFormatter = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const formatReportDateTime = (date: Date | null) => date ? formatDateTime(date) : "Not recorded";
+const formatReportDateTime = (date: Date | null) => date ? <LocalDateTime value={date} /> : "Not recorded";
 const formatStatus = (status: string) => status.replaceAll("_", " ");
 
 export default async function ReportsPage({ searchParams }: {
@@ -93,7 +93,7 @@ export default async function ReportsPage({ searchParams }: {
           <div>
             <label htmlFor="report-event">Event</label>
             <select id="report-event" name="event" defaultValue={event.id} key={event.id}>
-              {events.map((item) => <option key={item.id} value={item.id}>{item.title} ({formatDate(item.start_at)})</option>)}
+              {events.map((item) => <option key={item.id} value={item.id}>{item.title} (<LocalDateTime value={item.start_at} dateOnly />)</option>)}
             </select>
           </div>
           <button type="submit">View report</button>
@@ -104,7 +104,7 @@ export default async function ReportsPage({ searchParams }: {
       <div className={styles.eventHeader}>
         <p className={styles.organization}>{organization.name}</p>
         <h2>{event.title}</h2>
-        <p>{formatDateTimeRange(event.start_at, event.end_at)}</p>
+        <p><LocalDateTime value={event.start_at} end={event.end_at} /></p>
         <p>{event.is_virtual ? "Virtual event" : [event.location_name, event.city].filter(Boolean).join(", ") || "Location not specified"}</p>
         <p className={styles.metadata}>Event status: {formatStatus(event.status)} | Generated {formatReportDateTime(new Date())}</p>
       </div>

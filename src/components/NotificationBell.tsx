@@ -22,31 +22,43 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestId = useRef(0);
 
-  async function loadNotifications() {
-    setIsLoading(true);
-    setError("");
-    try {
-      const [recentResponse, unreadResponse] = await Promise.all([
-        fetch("/api/notifications?limit=8", { cache: "no-store" }),
-        fetch("/api/notifications?unread=true&limit=1", { cache: "no-store" }),
-      ]);
-      if (!recentResponse.ok || !unreadResponse.ok) return;
+  function loadNotifications() {
+    const currentRequest = ++requestId.current;
+    return Promise.all([
+      fetch("/api/notifications?limit=8", { cache: "no-store" }),
+      fetch("/api/notifications?unread=true&limit=1", { cache: "no-store" }),
+    ]).then(async ([recentResponse, unreadResponse]) => {
+      if (currentRequest !== requestId.current) return;
+      if (!recentResponse.ok || !unreadResponse.ok) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setIsOpen(false);
+        setError("Notifications are unavailable. Please verify that you are signed in.");
+        return;
+      }
       const result: NotificationsResponse = await recentResponse.json();
       const unreadResult: NotificationsResponse = await unreadResponse.json();
+      if (currentRequest !== requestId.current) return;
+      setError("");
       setNotifications(result.data);
       setUnreadCount(unreadResult.pagination.total);
-    } catch {
+    }).catch(() => {
+      if (currentRequest !== requestId.current) return;
+      setNotifications([]);
+      setUnreadCount(0);
       setError("Notifications could not be refreshed.");
-    } finally {
-      setIsLoading(false);
-    }
+    }).finally(() => {
+      if (currentRequest === requestId.current) setIsLoading(false);
+    });
   }
 
   useEffect(() => {
+    const requests = requestId;
     loadNotifications();
     const handleOutsideClick = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) {
@@ -60,6 +72,7 @@ export function NotificationBell() {
     window.addEventListener("focus", handleWindowFocus);
 
     return () => {
+      requests.current++;
       document.removeEventListener("mousedown", handleOutsideClick);
       window.clearInterval(refreshInterval);
       window.removeEventListener("focus", handleWindowFocus);
@@ -70,6 +83,12 @@ export function NotificationBell() {
     if (!notification.read_at) {
       const response = await fetch(`/api/notifications/${notification.id}/read`, { method: "PATCH" });
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          requestId.current++;
+          setNotifications([]);
+          setUnreadCount(0);
+          setIsOpen(false);
+        }
         setError("Notification could not be marked as read.");
         return;
       }
@@ -94,7 +113,10 @@ export function NotificationBell() {
         aria-expanded={isOpen}
         onClick={() => {
           setIsOpen((open) => !open);
-          if (!isOpen) loadNotifications();
+          if (!isOpen) {
+            setIsLoading(true);
+            loadNotifications();
+          }
         }}
         className="relative grid size-9 place-items-center rounded-md text-slate-700 hover:bg-slate-100 hover:text-emerald-700"
       >

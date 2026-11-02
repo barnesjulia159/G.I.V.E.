@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
 import { archiveMessage } from "@/lib/actions/messages";
-import { createClient } from "@/lib/supabase/server";
+import { requireSignedInAccount } from "@/lib/authorization";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type NotificationsPageProps = {
   searchParams: Promise<{ message?: string }>;
@@ -11,19 +11,7 @@ type NotificationsPageProps = {
 
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
   const { message: statusMessage } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return (
-      <section className="rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-bold">Messages</h1>
-        <p className="mt-2 text-slate-700">Sign in to view your messages.</p>
-      </section>
-    );
-  }
+  const { user } = await requireSignedInAccount();
 
   const received = await prisma.notification.findMany({
     where: { recipient_id: user.id, status: "sent", archived_at: null },
@@ -149,7 +137,7 @@ function MessageSection({ title, messages, showArchive = false }: MessageSection
               </div>
               <div className="mt-3 flex items-center justify-between gap-4">
                 <p className="text-xs text-slate-500">
-                  {formatDateTime(notification.created_at)}
+                  <LocalDateTime value={notification.created_at} />
                 </p>
                 {showArchive && (
                   <form action={archiveMessage}>

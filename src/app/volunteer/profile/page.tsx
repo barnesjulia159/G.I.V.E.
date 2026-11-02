@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/date-format";
+import { notFound } from "next/navigation";
+import { requireActionAccount } from "@/lib/authorization";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { prisma } from "@/lib/prisma";
 import {
   updateVolunteerAvailability,
@@ -45,9 +45,7 @@ function formatLabel(value: string) {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { title: "Profile" };
+  const { user } = await requireActionAccount("volunteer");
 
   const profile = await prisma.profile.findUnique({
     where: { id: user.id },
@@ -69,9 +67,7 @@ type ProfilePageProps = {
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const { error, message } = await searchParams;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user } = await requireActionAccount("volunteer");
 
   const profile = await prisma.profile.findUnique({
     where: { id: user.id },
@@ -269,12 +265,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
                 <ProfileField
                   label="Member since"
-                  value={formatDate(profile.createdAt)}
+                  value={<LocalDateTime value={profile.createdAt} dateOnly />}
                 />
 
                 <ProfileField
                   label="Last updated"
-                  value={formatDate(profile.updatedAt)}
+                  value={<LocalDateTime value={profile.updatedAt} dateOnly />}
                 />
               </dl>
             </ProfileSection>
@@ -305,7 +301,7 @@ function ProfileField({
   href,
 }: {
   label: string;
-  value: string | null;
+  value: React.ReactNode;
   href?: string;
 }) {
   return (

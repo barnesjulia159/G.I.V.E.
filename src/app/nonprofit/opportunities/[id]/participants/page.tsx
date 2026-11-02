@@ -8,6 +8,7 @@ import { LiveParticipants } from "@/components/LiveParticipants";
 import { RoleGate } from "@/components/RoleGate";
 import { prisma } from "@/lib/prisma";
 import { requireNonprofitOrganization } from "@/lib/authorization";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type ParticipantsPageProps = {
   params: Promise<{ id: string }>;
@@ -139,7 +140,7 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
                       <dt className="font-medium">Checked in:</dt>
                       <dd>
                         {attendance?.check_in_at
-                          ? attendance.check_in_at.toLocaleString()
+                          ? <LocalDateTime value={attendance.check_in_at} />
                           : "Not recorded"}
                       </dd>
                     </div>
@@ -147,14 +148,14 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
                       <dt className="font-medium">Checked out:</dt>
                       <dd>
                         {attendance?.check_out_at
-                          ? attendance.check_out_at.toLocaleString()
+                          ? <LocalDateTime value={attendance.check_out_at} />
                           : "Not recorded"}
                       </dd>
                     </div>
                     {attendance?.recorded_at && (
                       <div className="flex flex-wrap gap-x-1 text-xs text-slate-500">
                         <dt>Attendance recorded:</dt>
-                        <dd>{attendance.recorded_at.toLocaleString()}</dd>
+                        <dd><LocalDateTime value={attendance.recorded_at} /></dd>
                       </div>
                     )}
                   </dl>

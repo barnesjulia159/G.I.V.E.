@@ -10,17 +10,23 @@ export async function getActiveProfile(userId: string) {
   });
 }
 
-export async function requireActionAccount(role: "nonprofit" | "volunteer") {
+export async function requireSignedInAccount(
+  roles: readonly ("admin" | "nonprofit" | "volunteer")[] = ["admin", "nonprofit", "volunteer"],
+) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const profile = await getActiveProfile(user.id);
-  if (!isActiveRole(profile, [role])) {
+  if (!profile || !isActiveRole(profile, roles)) {
     redirect("/login?error=An active account with the required role is needed.");
   }
 
-  return { supabase, user };
+  return { supabase, user, profile };
+}
+
+export async function requireActionAccount(role: "nonprofit" | "volunteer") {
+  return requireSignedInAccount([role]);
 }
 
 export async function requireNonprofitOrganization() {

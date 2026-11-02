@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveProfile } from "@/lib/authorization";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -17,6 +18,9 @@ export async function GET(request: Request) {
   const { user } = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!await getActiveProfile(user.id)) {
+    return NextResponse.json({ message: "An active account is required" }, { status: 403 });
   }
 
   const url = new URL(request.url);
@@ -55,13 +59,16 @@ export async function GET(request: Request) {
       total,
       totalPages: Math.ceil(total / limit),
     },
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (!await getActiveProfile(user.id)) {
+    return NextResponse.json({ message: "An active account is required" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null);

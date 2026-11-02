@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PublicOpportunityListing } from "@/lib/types";
 import { createBooking } from "@/lib/actions/bookings";
 import { SubmitButton } from "@/components/SubmitButton";
-import { formatDateTimeRange } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type OpportunityDetailsPageProps = {
 	params: Promise<{
@@ -108,7 +108,7 @@ export default async function OpportunityDetailsPage({
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Date</dt>
 							<dd>
-								{formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
+								<LocalDateTime value={opportunity.start_at} end={opportunity.end_at} />
 							</dd>
 						</div>
 

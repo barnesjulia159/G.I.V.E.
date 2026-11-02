@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PublicOpportunityListing } from "@/lib/types";
-import { formatDateTimeRange } from "@/lib/date-format";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type OpportunityCardProps = {
   opportunity: PublicOpportunityListing;
@@ -25,7 +25,7 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
 
       <div className="mt-4 space-y-1 text-sm text-slate-600">
         <p>
-          <strong>Date:</strong> {formatDateTimeRange(opportunity.start_at, opportunity.end_at)}
+          <strong>Date:</strong> <LocalDateTime value={opportunity.start_at} end={opportunity.end_at} />
         </p>
         <p>
           <strong>Location:</strong>{" "}

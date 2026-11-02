@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { SubmitButton } from "@/components/SubmitButton";
 import { saveOrSendMessage } from "@/lib/actions/messages";
-import { createClient } from "@/lib/supabase/server";
+import { requireSignedInAccount } from "@/lib/authorization";
 
 type NewMessagePageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -17,28 +16,14 @@ type Recipient = {
 
 export default async function NewMessagePage({ searchParams }: NewMessagePageProps) {
   const { error } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile || !["volunteer", "nonprofit"].includes(profile.role)) {
-    redirect("/notifications");
-  }
+  const { supabase, user, profile } = await requireSignedInAccount(["volunteer", "nonprofit"]);
 
   const recipientRole = profile.role === "volunteer" ? "nonprofit" : "volunteer";
   const { data } = await supabase
     .from("profiles")
     .select("id, display_name, first_name, last_name")
     .eq("role", recipientRole)
+    .eq("is_active", true)
     .neq("id", user.id)
     .order("display_name");
   const recipients = (data ?? []) as Recipient[];

@@ -74,6 +74,7 @@ export async function signIn(formData: FormData) {
   if (!dashboardPath) {
     redirect(`/login?error=${encodeURIComponent("Your account role could not be determined. Please contact support.")}`);
   }
+  revalidatePath("/", "layout");
   redirect(dashboardPath);
 }
 
