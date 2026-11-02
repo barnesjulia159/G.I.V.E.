@@ -88,13 +88,6 @@ select {
   padding: 0.75rem;
   color: #991b1b;
 }
-/* styles.css */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.6;
@@ -320,7 +313,7 @@ body {
   text-underline-offset: 3px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .auth-layout,
   .auth-layout--register {
     width: min(100%, 34rem);
@@ -355,6 +348,10 @@ body {
   .auth-card {
     padding: 1.75rem 1.5rem;
   }
+
+  .auth-card .form-input {
+    font-size: 1rem;
+  }
 }
 
 @media (max-width: 420px) {
@@ -374,9 +371,29 @@ body {
 }
 
 .app-shell {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
   min-height: calc(100vh - 5rem);
+  padding-inline: clamp(1rem, 3vw, 2.5rem);
   padding-top: clamp(1.5rem, 4vw, 3rem);
   padding-bottom: clamp(2rem, 5vw, 4rem);
+}
+
+.app-shell > *,
+.auth-layout > * {
+  min-width: 0;
+}
+
+.site-header-inner {
+  display: flex;
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem clamp(1rem, 3vw, 2.5rem);
 }
 
 .app-shell h1,
@@ -509,12 +526,6 @@ body {
   align-items: center;
 }
 
-@media (min-width: 768px) {
-  .site-menu > .site-nav {
-    display: flex !important;
-  }
-}
-
 .table-scroll {
   max-width: 100%;
   overflow-x: auto;
@@ -533,8 +544,8 @@ body {
   text-align: center;
 }
 
-@media (max-width: 767px) {
-  header > div {
+@media (max-width: 1023px) {
+  .site-header-inner {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
@@ -598,6 +609,10 @@ body {
     box-shadow: var(--shadow-soft);
   }
 
+  .site-menu:not([data-open="true"]) .site-nav {
+    display: none;
+  }
+
   .site-nav a,
   .site-nav button {
     justify-content: flex-start;
@@ -630,13 +645,16 @@ body {
 
 .home-intro {
   max-width: 56rem;
+  margin-inline: auto;
   padding: 0;
+  text-align: center;
 }
 
 .home-brand {
   display: flex;
   align-items: center;
   gap: 1.25rem;
+  justify-content: center;
   margin-bottom: 1.5rem;
 }
 
@@ -669,7 +687,7 @@ body {
 
 .home-summary {
   max-width: 42rem;
-  margin: 1.15rem 0 0;
+  margin: 1.15rem auto 0;
   color: #52676d;
   font-size: 1.1rem;
   line-height: 1.75;
@@ -680,6 +698,7 @@ body {
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 1.5rem;
+  justify-content: center;
 }
 
 .home-primary-action,
@@ -732,7 +751,11 @@ body {
   color: #172b30;
   font-size: 1.65rem;
   font-weight: 700;
-  text-align: left;
+  text-align: center;
+}
+
+.home-process-heading {
+  text-align: center;
 }
 
 .home-steps {
@@ -806,7 +829,11 @@ body {
   }
 
   .home-intro h1 {
-    font-size: 2.5rem;
+    font-size: clamp(2rem, 8vw, 2.5rem);
+  }
+
+  .home-actions > a {
+    width: 100%;
   }
 
   .home-summary {

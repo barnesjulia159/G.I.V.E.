@@ -24,6 +24,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Responsive layout
+
+The shared header and page shell are centered within an 80rem desktop container
+with fluid gutters. Navigation is inline from 1024px and uses an expandable,
+keyboard-accessible menu below that breakpoint. Authentication screens stack below
+901px; homepage actions and opportunity cards adapt to narrow mobile screens.
+Global resets rely on Tailwind Preflight so spacing and centering utilities work.
+
 ## Transactional bookings
 
 Apply `supabase/migrations/20261029000000_transactional_bookings.sql` through

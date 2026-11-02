@@ -22,7 +22,7 @@ export default function RootLayout({
         <main
           id="main-content"
           tabIndex={-1}
-          className="app-shell mx-auto max-w-6xl px-4 py-8"
+          className="app-shell"
         >
           {children}
         </main>
