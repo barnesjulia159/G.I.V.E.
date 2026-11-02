@@ -68,24 +68,24 @@ test("CSRF and CORS accept only same-origin API requests and authenticated brows
   for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
     for (const path of ["/login", "/api/attendance/check-in", "/api/volunteer/profile/photo", "/api/anything.svg"]) {
       const request = (headers) => new Request(`${origin}${path}`, { method, headers });
-      assert.equal(isTrustedRequest(request({ origin }), origin), true);
-      assert.equal(isTrustedRequest(request({ referer: `${origin}/profile` }), origin), true);
+      assert.equal(isTrustedRequest(request({ origin })), true);
+      assert.equal(isTrustedRequest(request({ referer: `${origin}/profile` })), true);
       for (const headers of [
         {}, { origin: "null" }, { origin: "https://evil.test" },
         { origin: "https://give.test.evil.test" }, { origin: `${origin}/` },
         { referer: "invalid" }, { referer: "https://evil.test/form" },
         { origin, "sec-fetch-site": "cross-site" },
         { origin, "sec-fetch-site": "same-site" },
-      ]) assert.equal(isTrustedRequest(request(headers), origin), false, JSON.stringify(headers));
+      ]) assert.equal(isTrustedRequest(request(headers)), false, JSON.stringify(headers));
     }
   }
   for (const method of ["GET", "HEAD", "OPTIONS"]) {
-    assert.equal(isTrustedRequest(new Request(`${origin}/api/notifications`, { method, headers: { origin: "https://evil.test" } }), origin), false);
-    assert.equal(isTrustedRequest(new Request(`${origin}/api/notifications`, { method, headers: { origin } }), origin), true);
+    assert.equal(isTrustedRequest(new Request(`${origin}/api/notifications`, { method, headers: { origin: "https://evil.test" } })), false);
+    assert.equal(isTrustedRequest(new Request(`${origin}/api/notifications`, { method, headers: { origin } })), true);
   }
-  assert.equal(isTrustedRequest(new Request(`${origin}/callback?code=example`, { headers: { "sec-fetch-site": "cross-site" } }), origin), true);
-  assert.equal(isTrustedRequest(new Request(`${origin}/opportunities`), origin), true);
-  assert.equal(isTrustedRequest(new Request("http://internal.test/api/test", { method: "POST", headers: { origin } }), origin), true);
+  assert.equal(isTrustedRequest(new Request(`${origin}/callback?code=example`, { headers: { "sec-fetch-site": "cross-site" } })), true);
+  assert.equal(isTrustedRequest(new Request(`${origin}/opportunities`)), true);
+  assert.equal(isTrustedRequest(new Request("http://internal.test/api/test", { method: "POST", headers: { origin } })), false);
   assert.equal(isTrustedRequest(new Request("http://localhost:3000/api/test", {
     method: "POST", headers: { host: "localhost:3218", origin: "http://localhost:3218" },
   })), true);
@@ -106,6 +106,39 @@ test("proxy rejects cross-origin requests before touching sessions and does not 
       sessionCalls++;
       return new Response("OK");
     } },
+  });
+
+  test("hosted login actions use their own origin regardless of a stale callback site URL", async () => {
+    const previousSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    let sessionCalls = 0;
+    try {
+      const handler = await loadServerModule("../proxy.ts", {
+        "next/server": { NextResponse: class extends Response {
+          static json(body, init) { return Response.json(body, init); }
+        } },
+        "@/lib/request-security": { isTrustedRequest },
+        "@/lib/supabase/middleware": { updateSession: async () => {
+          sessionCalls++;
+          return new Response("Next action handler");
+        } },
+      });
+      const request = (origin) => Object.assign(new Request("https://givevolunteering.app/login", {
+        method: "POST", headers: {
+          host: "givevolunteering.app", origin, "sec-fetch-site": "same-origin",
+          "next-action": "diagnostic-action",
+        },
+      }), { nextUrl: new URL("https://givevolunteering.app/login") });
+      assert.equal((await handler.proxy(request("https://givevolunteering.app"))).status, 200);
+      assert.equal(sessionCalls, 1);
+      for (const origin of ["https://evil.test", "http://localhost:3000", "https://www.givevolunteering.app"]) {
+        assert.equal((await handler.proxy(request(origin))).status, 403);
+      }
+      assert.equal(sessionCalls, 1);
+    } finally {
+      if (previousSiteUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+      else process.env.NEXT_PUBLIC_SITE_URL = previousSiteUrl;
+    }
   });
   const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://give.test").origin;
   const request = (path, method, headers = {}) => Object.assign(

@@ -195,9 +195,10 @@ Top-level GET pages and Supabase's GET auth callback remain reachable from exter
 navigation. Non-browser mutation clients must provide a matching origin; there is
 no bearer-token exemption for these cookie-authenticated endpoints.
 
-Set `NEXT_PUBLIC_SITE_URL` to the canonical deployment URL (scheme, hostname and
-port must match the browser origin). Without it, checks use the request protocol
-and browser-facing `Host`. The ingress must validate the external host/protocol and must not forward
+Set `NEXT_PUBLIC_SITE_URL` to the canonical deployment URL for authentication
+callback links. CSRF checks independently use the request protocol and browser-facing
+`Host`, so a stale callback URL cannot reject a legitimate same-origin login action.
+The ingress must validate the external host/protocol and must not forward
 untrusted host overrides; spoofable forwarded IP/origin headers are not used to
 relax the checks. Alternate browser frontends are intentionally not allowlisted.
 
