@@ -54,7 +54,7 @@ export function formatDateTimeRange(startValue: Date | string, endValue: Date | 
   }
 
   if (startDate === endDate) {
-    return `${startDate}, ${timeFormatter.format(start)}-${timeFormatter.format(end)} ${startZone}`;
+    return `${startDate}, ${timeFormatter.format(start)} - ${timeFormatter.format(end)} ${startZone}`;
   }
 
   return `${startDate}, ${timeFormatter.format(start)} - ${endDate}, ${timeFormatter.format(end)} ${startZone}`;

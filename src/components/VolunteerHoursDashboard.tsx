@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LocalDateTime } from "@/components/LocalDateTime";
 
+import { groupHoursByOpportunity } from "@/lib/hours-summary";
+
 type HoursEntry = {
+  opportunityId: string;
   id: string;
   bookingId: string | null;
   opportunityTitle: string;
@@ -14,6 +17,7 @@ type HoursEntry = {
   status: string;
   source: "attendance" | "manual";
   hoursOverridden?: boolean;
+  verificationPending?: boolean;
   notes: string | null;
 };
 
@@ -34,9 +38,8 @@ export function VolunteerHoursDashboard() {
   const [activeBookings, setActiveBookings] = useState<ActiveBooking[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
-  const fetchHours = async () => {
-    try {
-      const response = await fetch("/api/attendance/hours", { cache: "no-store" });
+  const fetchHours = useCallback(() => {
+    return fetch("/api/attendance/hours", { cache: "no-store" }).then(async (response) => {
       const data = response.ok ? await response.json() : { data: [], totalHours: 0 };
       setResult(data);
       setLastUpdated(new Date());
@@ -51,39 +54,13 @@ export function VolunteerHoursDashboard() {
           checkOutAt: entry.checkOutAt,
         }));
       setActiveBookings(active);
-    } catch (error) {
+    }).catch((error) => {
       console.error("Failed to fetch hours:", error);
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
       setIsRefreshing(false);
-    }
-  };
-
-  const handleCheckIn = async (bookingId: string) => {
-    setActionLoading((prev) => ({ ...prev, [bookingId]: true }));
-    try {
-      const response = await fetch("/api/attendance/check-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
-      });
-      if (response.ok) {
-        await fetchHours();
-        // Broadcast update to other pages/tabs
-        try {
-          const channel = new BroadcastChannel("attendance-updates");
-          channel.postMessage({ type: "attendance-update", action: "check-in", bookingId });
-          channel.close();
-        } catch (error) {
-          console.warn("BroadcastChannel not supported");
-        }
-      }
-    } catch (error) {
-      console.error("Check-in failed:", error);
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [bookingId]: false }));
-    }
-  };
+    });
+  }, []);
 
   const handleCheckOut = async (bookingId: string) => {
     setActionLoading((prev) => ({ ...prev, [bookingId]: true }));
@@ -100,7 +77,7 @@ export function VolunteerHoursDashboard() {
           const channel = new BroadcastChannel("attendance-updates");
           channel.postMessage({ type: "attendance-update", action: "check-out", bookingId });
           channel.close();
-        } catch (error) {
+        } catch {
           console.warn("BroadcastChannel not supported");
         }
       }
@@ -130,7 +107,7 @@ export function VolunteerHoursDashboard() {
           fetchHours();
         }
       };
-    } catch (error) {
+    } catch {
       console.warn("BroadcastChannel not supported, falling back to polling");
     }
     
@@ -147,12 +124,9 @@ export function VolunteerHoursDashboard() {
       channel?.close();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [fetchHours]);
 
-  const byOpportunity = result.data.reduce<Record<string, number>>((totals, entry) => {
-    totals[entry.opportunityTitle] = (totals[entry.opportunityTitle] ?? 0) + entry.hours;
-    return totals;
-  }, {});
+  const byOpportunity = groupHoursByOpportunity(result.data);
 
   return (
     <div className="mt-6 space-y-6">
@@ -237,9 +211,12 @@ export function VolunteerHoursDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(byOpportunity).map(([title, hours]) => (
-                  <tr key={title} className="border-b">
-                    <td className="px-5 py-3 font-medium">{title}</td>
+                {byOpportunity.map(({ id, title, hours, pendingApproval }) => (
+                  <tr key={id} className="border-b">
+                    <td className="px-5 py-3 font-medium">
+                      {title}
+                      {pendingApproval && <p className="text-sm font-normal text-slate-600">Completed attendance awaits organizer confirmation and is not included in these hours.</p>}
+                    </td>
                     <td className="px-5 py-3">{hours.toFixed(2)}</td>
                   </tr>
                 ))}

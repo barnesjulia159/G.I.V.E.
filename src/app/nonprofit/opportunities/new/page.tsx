@@ -137,6 +137,9 @@ async function OpportunityForm({
         <input type="checkbox" name="is_virtual" value="true" />
         Remote / virtual event
       </label>
+      <p className="text-sm text-slate-600">
+        To publish, add a venue, street address, or city, or mark this event as remote. Placeholder locations such as TBD are not sufficient.
+      </p>
 
       <div className="form-field">
         <label htmlFor="address_line1" className="form-label">

@@ -14,12 +14,6 @@ type ParticipantsPageProps = {
   params: Promise<{ id: string }>;
 };
 
-function calculateAttendanceHours(checkInAt: Date | null, checkOutAt: Date | null) {
-  if (!checkInAt || !checkOutAt) return 0;
-  const elapsed = checkOutAt.getTime() - checkInAt.getTime();
-  return elapsed > 0 ? elapsed / 3_600_000 : 0;
-}
-
 export default async function ParticipantsPage({ params }: ParticipantsPageProps) {
   const { id } = await params;
 
@@ -56,6 +50,8 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
         select: {
           status: true,
           recorded_at: true,
+          verified_at: true,
+          verified_by: true,
           check_in_at: true,
           check_out_at: true,
         },
@@ -126,7 +122,7 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
             const attendance = booking.attendanceLog;
             const hoursOverride = hoursOverrides.get(booking.id) ?? null;
             const currentHours = hoursOverride ?? (
-              calculateAttendanceHours(attendance?.check_in_at ?? null, attendance?.check_out_at ?? null) +
+              confirmedAttendanceHours(attendance) +
               (manualHoursByVolunteer.get(booking.volunteer_id) ?? 0)
             );
 
@@ -164,6 +160,11 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
                   bookingId={booking.id}
                   initialStatus={attendance?.status}
                 />
+                {attendance?.check_out_at && (
+                  <p className="text-sm text-slate-600">
+                    {attendance.verified_at ? "Session hours confirmed." : "Session hours await confirmation. Save Present to confirm the completed session, or correct its times first."}
+                  </p>
+                )}
                 <ManualCheckoutControl
                   bookingId={booking.id}
                   initialCheckInAt={attendance?.check_in_at?.toISOString() ?? null}
@@ -188,3 +189,4 @@ async function ParticipantsContent({ opportunityId }: { opportunityId: string })
     </section>
   );
 }
+import { confirmedAttendanceHours } from "@/lib/event-report";

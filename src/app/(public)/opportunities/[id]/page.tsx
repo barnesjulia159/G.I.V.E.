@@ -5,6 +5,7 @@ import { PublicOpportunityListing } from "@/lib/types";
 import { createBooking } from "@/lib/actions/bookings";
 import { SubmitButton } from "@/components/SubmitButton";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { formatOpportunityLocation } from "@/lib/opportunity-validation";
 
 type OpportunityDetailsPageProps = {
 	params: Promise<{
@@ -39,10 +40,13 @@ export default async function OpportunityDetailsPage({
 	}
 
 	const opportunity = data as PublicOpportunityListing;
-	const [{ data: opportunitySkills }, { data: opportunityCauses }] = await Promise.all([
+	const [{ data: opportunitySkills, error: skillsError }, { data: opportunityCauses, error: causesError }] = await Promise.all([
 		supabase.from("opportunity_skills").select("skills(name)").eq("opportunity_id", id),
 		supabase.from("opportunity_causes").select("causes(name)").eq("opportunity_id", id),
 	]);
+	if (skillsError || causesError) {
+		console.error("Opportunity skills or causes lookup failed:", skillsError, causesError);
+	}
 	const skillNames = (opportunitySkills ?? []).flatMap(({ skills }) =>
 		(Array.isArray(skills) ? skills : [skills]).map((skill) => skill?.name).filter(Boolean)
 	);
@@ -78,7 +82,7 @@ export default async function OpportunityDetailsPage({
 	}
 
 	return (
-		<section className="mx-auto max-w-4xl space-y-6">
+		<section className="mx-auto min-w-0 max-w-4xl space-y-6 wrap-break-word">
 			<Link
 				href="/opportunities"
 				className="inline-flex text-sm font-medium text-emerald-700 hover:text-emerald-800"
@@ -86,9 +90,11 @@ export default async function OpportunityDetailsPage({
 				Back to opportunities
 			</Link>
 
-			<div className="rounded-2xl bg-white p-6 shadow-sm">
+			<div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm">
 				<p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
-					{opportunity.organization_name}
+					<Link href={`/organizations/${opportunity.organization_id}`} className="hover:underline">
+						{opportunity.organization_name}
+					</Link>
 				</p>
 
 				<h1 className="mt-2 text-4xl font-bold text-slate-950">
@@ -98,6 +104,9 @@ export default async function OpportunityDetailsPage({
 				<p className="mt-4 text-base leading-7 text-slate-700">
 					{opportunity.description}
 				</p>
+				<Link href={`/organizations/${opportunity.organization_id}`} className="mt-4 inline-flex text-sm font-medium text-emerald-700 hover:underline">
+					Learn about this organization
+				</Link>
 			</div>
 
 			<div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
@@ -115,16 +124,7 @@ export default async function OpportunityDetailsPage({
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Location</dt>
 							<dd>
-								{opportunity.is_virtual
-									? "Virtual"
-									: [
-											opportunity.location_name,
-											[opportunity.city, opportunity.state]
-												.filter(Boolean)
-												.join(", "),
-										]
-											.filter(Boolean)
-											.join(" - ") || "Location TBD"}
+								{formatOpportunityLocation(opportunity)}
 							</dd>
 						</div>
 
@@ -151,12 +151,18 @@ export default async function OpportunityDetailsPage({
 
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Requested skills</dt>
-							<dd>{skillNames.length ? skillNames.join(", ") : "None specified"}</dd>
+							<dd>
+								{skillsError ? <span role="alert" className="text-red-700">Skills could not be loaded. Please try again.</span>
+									: skillNames.length ? skillNames.join(", ") : "No skills listed by the organization."}
+							</dd>
 						</div>
 
 						<div>
 							<dt className="text-sm font-medium text-slate-500">Related causes</dt>
-							<dd>{causeNames.length ? causeNames.join(", ") : "None specified"}</dd>
+							<dd>
+								{causesError ? <span role="alert" className="text-red-700">Causes could not be loaded. Please try again.</span>
+									: causeNames.length ? causeNames.join(", ") : "No causes listed by the organization."}
+							</dd>
 						</div>
 
 						{opportunity.accessibility_notes && (
@@ -170,7 +176,7 @@ export default async function OpportunityDetailsPage({
 					</dl>
 				</div>
 
-				<aside className="rounded-2xl bg-white p-6 shadow-sm">
+				<aside className="min-w-0 rounded-2xl bg-white p-6 shadow-sm">
 					<h2 className="text-2xl font-semibold text-slate-950">Ready to help?</h2>
 
 					{error && <p className="alert-error mt-3">{error}</p>}

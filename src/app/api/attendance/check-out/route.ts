@@ -26,7 +26,10 @@ export async function POST(request: Request) {
 
   const attendance = await prisma.attendanceLog.findFirst({
     where: { booking_id: bookingId, booking: { volunteer_id: user.id } },
-    include: { booking: { select: { volunteer_id: true } } },
+    include: { booking: { select: {
+      volunteer_id: true, status: true,
+      opportunity: { select: { start_at: true, end_at: true, is_deleted: true } },
+    } } },
   });
 
   if (!attendance || attendance.booking.volunteer_id !== user.id) {
@@ -47,10 +50,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const updated = await prisma.attendanceLog.update({
-    where: { id: attendance.id },
-    data: { check_out_at: new Date(), status: "present" },
+  if (attendance.verified_at || attendance.booking.status !== "booked" || attendance.booking.opportunity.is_deleted) {
+    return NextResponse.json({ message: "This attendance cannot be changed by the volunteer. Contact the organizer." }, { status: 409 });
+  }
+  const now = new Date();
+  const opportunity = attendance.booking.opportunity;
+  const checkOutAt = new Date(Math.min(now.getTime(), opportunity.end_at.getTime()));
+  if (attendance.check_in_at < opportunity.start_at || checkOutAt <= attendance.check_in_at) {
+    return NextResponse.json({ message: "Session times must fall within the event. Contact the organizer for corrections." }, { status: 409 });
+  }
+  const [updated] = await prisma.attendanceLog.updateManyAndReturn({
+    where: { id: attendance.id, check_in_at: attendance.check_in_at, check_out_at: null, verified_at: null },
+    data: { check_out_at: checkOutAt, status: "present", verified_at: null, verified_by: null },
   });
 
+  if (!updated) {
+    return NextResponse.json({ message: "Attendance changed. Reload before checking out." }, { status: 409 });
+  }
   return NextResponse.json(updated);
 }

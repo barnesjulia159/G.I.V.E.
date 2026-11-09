@@ -32,6 +32,21 @@ keyboard-accessible menu below that breakpoint. Authentication screens stack bel
 901px; homepage actions and opportunity cards adapt to narrow mobile screens.
 Global resets rely on Tailwind Preflight so spacing and centering utilities work.
 
+## Public organization pages
+
+Each nonprofit has a public home page at `/organizations/{organization_id}`.
+Volunteers can reach it through the organization name on opportunity cards,
+opportunity details, or their bookings. The page shows the organization's mission,
+description, contact information, website, and address, plus all its published,
+nondeleted opportunities, grouped into upcoming/ongoing and past events. Draft,
+closed, and archived opportunities are not displayed.
+
+Nonprofits maintain this information in Organization Profile and can open the
+public page from their profile or dashboard. No sign-in or new database migration
+is required; the page uses the existing public organization RLS policy and public
+opportunity listing view. Profile saves and opportunity changes invalidate public
+organization pages; requests also read fresh data.
+
 ## Local timezone display
 
 Event cards/details, dashboards, booking dates, attendance, reports, notifications,
@@ -44,6 +59,102 @@ Stored timestamps and the upcoming-opportunity cutoff remain absolute instants.
 Server-generated notification bodies and email timestamps stay explicitly labelled
 UTC because the recipient's browser timezone is not available to background work.
 This change does not alter event date entry or the date-search filter's UTC semantics.
+
+## Public listing quality (BUG-006 through BUG-014)
+
+- Event times omit seconds, use a spaced range separator, and label the viewer's
+  timezone (UTC in server HTML and server-generated notifications).
+- Capacity wording uses "1 spot" and "0/2+ spots"; public cards and details share
+  location formatting, including virtual events. Legacy missing locations say
+  "Location not provided. Contact the organization for details."
+- Create/edit actions require at least 50 trimmed description characters and a
+  nonblank venue, street address, or city (or an explicit remote designation) before
+  publication. Common placeholders such as "TBD" do not satisfy location validation;
+  drafts remain editable. Minimum length is not a substitute for editorial review
+  of garbled or placeholder descriptions.
+- Skills/causes are optional. Empty associations say "No skills/causes listed by
+  the organization." Public lookup failures instead show an error, not an empty-data
+  fallback.
+- Apply `supabase/migrations/20261109000000_public_opportunity_location.sql`
+  with the normal Supabase deployment to show address-only venues on public cards
+  and details. It keeps the view's column shape, publication filters, and invoker RLS.
+  No records are changed or deleted.
+- BUG-006/BUG-014 release cleanup remains pending. Local demonstration records
+  are intentionally retained. Before public release, identify test organizations
+  and opportunities by confirmed IDs, review associated bookings/history, and
+  remove or separate them from the production dataset. Do not automatically delete
+  records using ambiguous title/name matches such as "NEW" or "Opp".
+
+## QA regression follow-up
+
+Registration validates email syntax, required email/password, permitted account
+types, and the existing six-character password minimum on the server before
+provider access. Padding spaces do not count toward the minimum for signup or
+reset. Supabase's configured provider policy still applies; this is not a new
+password-strength policy. First/last name remain optional. Duplicate-provider
+responses do not report a successful registration. Auth errors use alert semantics.
+
+Publishing requires a title, valid calendar timestamps, and an end after the
+start, in addition to description, location, and positive integer capacity.
+The public directory shows 24 opportunities per page using a bounded query plus
+one look-ahead row and deterministic date/ID ordering. Page links retain filters;
+changing filters starts at page one. Clear filters resets the uncontrolled form
+when returning to the unfiltered route. Invalid dates, obsolete option IDs, and
+invalid page numbers produce explicit feedback. Keyword punctuation is quoted
+as a single PostgREST pattern, with literal wildcard characters escaped.
+
+Regression coverage includes all combinations of the test fixture's skill/cause
+options, combined keyword/city/date filters, clearing, pagination with a synthetic
+10,000-row fixture, invalid registrations, provider duplicates, and invalid
+published schedules. This is **not** a production load test. The existing
+disposable PostgreSQL concurrency/RLS suites are skipped unless their dedicated
+test database variables are configured; never point them at the application DB.
+
+QA-011/security follow-up: after approval of the security fix, attendance-derived
+hours require explicit organizer confirmation of a completed present session.
+Volunteers may check in only during the published event; checkout is capped at
+the event end. Conditional writes prevent volunteer timestamp changes from
+overwriting a confirmed session, and approval rejects concurrent timestamp changes.
+The hours API, event reports, and participant totals share the same confirmed-hours
+calculation. Authorized manual hours and overrides (including zero) retain their
+existing precedence. Pending completed sessions are labelled on the hours dashboard.
+Regressions compare volunteer API, organizer API, and report totals for pending,
+confirmed, manual, and zero-override scenarios, and check conditional writes during
+approval/checkout races. Set `ATTENDANCE_TEST_DATABASE_URL` to a separate empty
+disposable PostgreSQL database to exercise confirmation constraints and revoked
+end-user mutation privileges against real SQL.
+
+Apply `supabase/migrations/20261109000001_confirmed_attendance.sql` **before**
+deploying the approval code, then run `npm run prisma:generate`. The migration
+does not auto-confirm historical records: organizers must review completed sessions
+and save Present to confirm them, or correct times using the manual checkout control.
+It also removes direct end-user attendance mutation privileges; writes go through
+the authenticated, tenant-authorized server handlers. This migration has not been
+applied to the connected application database in this QA pass.
+
+QA-012 remains unresolved:
+booking commits and in-app notification writes are separate operations, so a
+notification failure after a successful booking is not repaired by a duplicate
+booking retry. Reliable notification delivery was not implemented in this QA pass.
+QA-013 (mandatory organization verification) and QA-014 (email/push delivery)
+are explicitly excluded.
+
+QA-020's hours dashboard title-collision defect is corrected: hours rows group by
+opportunity ID, not title, so separate events with the same name remain separate.
+This preserves the overall total; signed-in cross-role comparison testing is still
+required before marking the whole QA item complete.
+
+The hours dashboard uses a stable refresh callback whose state updates run in
+request-completion callbacks, not synchronously during effect setup. Its initial
+load, three-second polling, attendance broadcasts, visibility refresh, and
+subscription cleanup are covered by a component regression test.
+
+Public/auth pages were checked in the embedded Chromium browser at 320, 375, 768,
+and 1280 CSS pixels, including missing/invalid form fields, public filter reset,
+and anonymous protected-route redirects. Full keyboard-only/screen-reader
+validation, Firefox/WebKit testing, real PostgreSQL concurrency, and signed-in
+cross-role end-to-end comparisons remain release-validation gaps. A bounded source
+security review is not a penetration test or proof of deployed provider settings.
 
 ## Private volunteer accounts
 
@@ -58,6 +169,33 @@ clear personalized UI and reload the page to discard cached navigation; backgrou
 session checks also run on focus and every 30 seconds. Notification refresh failures
 clear previously loaded messages, including protection against stale in-flight
 responses. Public opportunity listings remain available without signing in.
+
+### Automatic logout
+
+Opening the GIVE home page (`/`), including logo navigation or returning through
+browser history, signs out the current browser session. The server clears auth
+cookies on actual home requests; link/browser prefetches never trigger sign-out.
+The client boundary covers cached navigation, hides account content during logout,
+and performs a full navigation to discard personalized router state.
+
+Signed-in users are also logged out after 30 minutes without pointer, keyboard,
+scroll, or touch activity. Activity is shared across tabs through local storage,
+scoped to the user and their sign-in time so a fresh login gets a fresh deadline.
+Polling and switching/minimizing tabs do not renew the deadline or immediately
+log the user out. A deadline timer, focus, visibility, and history-resume checks
+detect overdue logout, including when a sleeping PC resumes. Browsers cannot
+detect physical departure or reliably execute code while the PC/browser is
+suspended: inactivity logout is browser-enforced and runs when execution resumes.
+If local storage is unavailable, inactivity tracking falls back to the current
+tab and logs the lost cross-tab coordination.
+
+Missing/invalid sessions trigger local sign-out and return to login. Failed
+automatic sign-out hides account content and displays a retry control rather
+than claiming success. Automatic logout uses Supabase's `local` scope (this
+browser session and its tabs), without signing out unrelated devices. The manual
+sign-out button and password changes retain their existing global behavior.
+Revoking refresh sessions does not immediately invalidate already-issued access
+JWTs. Regression coverage is in `src/lib/session-lifecycle.test.mjs`.
 
 ## Transactional bookings
 

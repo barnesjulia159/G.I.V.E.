@@ -11,7 +11,7 @@
     "prestart": "npm run native:sync",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/event-report.test.mjs src/lib/opportunity-validation.test.mjs src/lib/date-format.test.mjs src/lib/access-control.test.mjs src/lib/authorization.test.mjs supabase/tests/transactional-bookings.test.mjs supabase/tests/tenant-authorization.test.mjs",
+    "test": "node --experimental-strip-types --test src/lib/event-report.test.mjs src/lib/hours-summary.test.mjs src/lib/opportunity-validation.test.mjs src/lib/date-format.test.mjs src/lib/access-control.test.mjs src/lib/auth-validation.test.mjs src/lib/authorization.test.mjs src/lib/session-lifecycle.test.mjs src/lib/organization-page.test.mjs supabase/tests/transactional-bookings.test.mjs supabase/tests/tenant-authorization.test.mjs supabase/tests/confirmed-attendance.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

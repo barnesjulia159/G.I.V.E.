@@ -6,6 +6,7 @@ import { requireActionAccount } from "@/lib/authorization";
 import { BookingWithOpportunity } from "@/lib/types";
 import { AttendanceControls } from "@/components/AttendanceControls";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { formatOpportunityLocation } from "@/lib/opportunity-validation";
 
 type VolunteerBookingsPageProps = {
   searchParams: Promise<{
@@ -135,16 +136,16 @@ async function VolunteerBookingsContent({
                           </span>
                         )}
                         <p className="text-sm font-medium text-emerald-700">
-                          {opportunity.organizations?.name}
+                          <Link href={`/organizations/${opportunity.organization_id}`} className="hover:underline">
+                            {opportunity.organizations?.name}
+                          </Link>
                         </p>
                         <h2 className="text-2xl font-semibold">{opportunity.title}</h2>
                         <p className="mt-2 text-slate-700">
                           <LocalDateTime value={opportunity.start_at} end={opportunity.end_at} />
                         </p>
                         <p className="text-slate-700">
-                          {[opportunity.location_name, opportunity.city, opportunity.state]
-                            .filter(Boolean)
-                            .join(", ") || "Location TBD"}
+                          {formatOpportunityLocation(opportunity)}
                         </p>
                       </>
                     ) : (

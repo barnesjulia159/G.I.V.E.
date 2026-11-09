@@ -66,7 +66,7 @@ export default async function ReportsPage({ searchParams }: {
       orderBy: { booked_at: "asc" },
       select: {
         id: true, volunteer_id: true, status: true, hours_override: true, hours_override_notes: true, notes: true,
-        attendanceLog: { select: { status: true, check_in_at: true, check_out_at: true, notes: true } },
+        attendanceLog: { select: { status: true, check_in_at: true, check_out_at: true, notes: true, verified_at: true, verified_by: true } },
       },
     }),
     prisma.volunteer_hours.findMany({

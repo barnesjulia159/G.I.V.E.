@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function saveOrganizationProfile(formData: FormData) {
@@ -49,6 +50,13 @@ export async function saveOrganizationProfile(formData: FormData) {
   if (error) {
     redirect(`/nonprofit/organization?error=${encodeURIComponent(error.message)}`);
   }
+
+  revalidatePath("/organizations/[id]", "page");
+  revalidatePath("/opportunities");
+  revalidatePath("/opportunities/[id]", "page");
+  revalidatePath("/nonprofit/organization");
+  revalidatePath("/nonprofit/dashboard");
+  revalidatePath("/volunteer/bookings");
 
   redirect("/nonprofit/dashboard?message=Organization profile saved.");
 }

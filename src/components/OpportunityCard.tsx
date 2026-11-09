@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicOpportunityListing } from "@/lib/types";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { formatOpportunityLocation } from "@/lib/opportunity-validation";
 
 type OpportunityCardProps = {
   opportunity: PublicOpportunityListing;
@@ -11,7 +12,9 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
     <article className="flex h-full min-w-0 flex-col wrap-break-word rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
       <div className="mb-4">
         <p className="text-sm font-medium text-emerald-700">
-          {opportunity.organization_name}
+          <Link href={`/organizations/${opportunity.organization_id}`} className="hover:underline">
+            {opportunity.organization_name}
+          </Link>
         </p>
 
         <h2 className="mt-1 text-xl font-semibold text-slate-950">
@@ -29,11 +32,7 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
         </p>
         <p>
           <strong>Location:</strong>{" "}
-          {opportunity.is_virtual
-            ? "Virtual"
-            : [opportunity.city, opportunity.state].filter(Boolean).join(", ") ||
-              opportunity.location_name ||
-              "Location TBD"}
+          {formatOpportunityLocation(opportunity)}
         </p>
         <p>
           <strong>{opportunity.spots_remaining === 1 ? "Spot" : "Spots"} remaining:</strong> {opportunity.spots_remaining}

@@ -11,4 +11,5 @@ export function invalidateOpportunityViews(opportunityId: string) {
   revalidatePath("/nonprofit/reports");
   revalidatePath("/volunteer/dashboard");
   revalidatePath("/admin/bookings");
+  revalidatePath("/organizations/[id]", "page");
 }

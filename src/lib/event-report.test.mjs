@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildEventReport } from "./event-report.ts";
+import { buildEventReport, confirmedAttendanceHours } from "./event-report.ts";
 
 const booking = {
   id: "booking-1", volunteer_id: "volunteer-1", status: "booked",
   hours_override: null, hours_override_notes: null, notes: null,
   attendanceLog: {
+    verified_at: new Date("2026-10-16T12:00:00Z"), verified_by: "organizer",
     status: "present", check_in_at: new Date("2026-10-16T09:00:00Z"),
     check_out_at: new Date("2026-10-16T11:30:00Z"), notes: null,
   },
@@ -47,4 +48,13 @@ test("multiple registrations do not duplicate manual hours", () => {
 test("empty events and invalid timestamp intervals produce zero totals", () => {
   assert.equal(buildEventReport([], [], []).totalHours, 0);
   assert.equal(buildEventReport([{ ...booking, attendanceLog: { ...booking.attendanceLog, check_out_at: new Date("2026-10-16T08:00:00Z") } }], [], []).totalHours, 0);
+});
+
+test("unconfirmed attendance earns no hours while authorized manual entries and zero overrides remain intact", () => {
+  const pending = { ...booking, attendanceLog: { ...booking.attendanceLog, verified_at: null, verified_by: null } };
+  assert.equal(confirmedAttendanceHours(pending.attendanceLog), 0);
+  assert.equal(buildEventReport([pending], [], []).totalHours, 0);
+  assert.equal(buildEventReport([pending], [manual], []).totalHours, 1);
+  assert.equal(buildEventReport([{ ...pending, hours_override: 0 }], [manual], []).totalHours, 0);
+  assert.equal(confirmedAttendanceHours({ ...booking.attendanceLog, status: "absent" }), 0);
 });

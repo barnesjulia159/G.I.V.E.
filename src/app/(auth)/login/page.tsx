@@ -32,8 +32,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p>Access your GIVE account.</p>
         </header>
 
-        {params.error && <p className="alert-error mt-4">{params.error}</p>}
-        {params.message && <p className="alert-info mt-4">{params.message}</p>}
+        {params.error && <p role="alert" className="alert-error mt-4">{params.error}</p>}
+        {params.message && <p role="status" className="alert-info mt-4">{params.message}</p>}
 
         {(params.unconfirmed !== undefined || params.error?.includes("confirmation")) && (
           <form action={resendConfirmation} className="auth-form">

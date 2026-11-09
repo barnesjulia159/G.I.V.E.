@@ -10,12 +10,15 @@ const statuses = [
   ["no_show", "No show"],
 ] as const;
 
+import { useRouter } from "next/navigation";
+
 type AttendanceRecorderProps = {
   bookingId: string;
   initialStatus?: string;
 };
 
 export function AttendanceRecorder({ bookingId, initialStatus = "" }: AttendanceRecorderProps) {
+  const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -39,7 +42,8 @@ export function AttendanceRecorder({ bookingId, initialStatus = "" }: Attendance
         return;
       }
 
-      setFeedback("Attendance recorded.");
+      setFeedback(result?.verified_at ? "Attendance and session hours confirmed." : "Attendance recorded. Completed present sessions need confirmation before hours count.");
+      router.refresh();
     } catch {
       setError("Unable to record attendance.");
     } finally {

@@ -51,7 +51,10 @@ export async function POST(request: Request) {
 
   const booking = await prisma.booking.findFirst({
     where: { id: bookingId, volunteer_id: user.id },
-    select: { id: true, volunteer_id: true, status: true },
+    select: {
+      id: true, volunteer_id: true, status: true,
+      opportunity: { select: { start_at: true, end_at: true, status: true, is_deleted: true } },
+    },
   });
 
   if (!booking || booking.volunteer_id !== user.id) {
@@ -66,30 +69,46 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
+  if (booking.opportunity.is_deleted || booking.opportunity.status !== "published" ||
+    now < booking.opportunity.start_at || now >= booking.opportunity.end_at) {
+    return NextResponse.json({ message: "Self check-in is available only during the published event. Contact the organizer for corrections." }, { status: 409 });
+  }
   const existing = await prisma.attendanceLog.findUnique({
     where: { booking_id: booking.id },
   });
 
-  if (existing?.check_in_at) {
+  if (existing?.check_in_at || existing?.verified_at) {
     return NextResponse.json(
       { message: existing.check_out_at ? "Attendance is already complete" : "Already checked in", attendance: existing },
       { status: 409 }
     );
   }
 
-  const attendance = existing
-    ? await prisma.attendanceLog.update({
-        where: { id: existing.id },
-        data: { status: "present", recorded_by: user.id, check_in_at: now },
-      })
-    : await prisma.attendanceLog.create({
+  if (existing) {
+    const [attendance] = await prisma.attendanceLog.updateManyAndReturn({
+      where: { id: existing.id, check_in_at: null, check_out_at: null, verified_at: null },
+      data: { status: "present", recorded_by: user.id, check_in_at: now, verified_at: null, verified_by: null },
+    });
+    if (!attendance) {
+      return NextResponse.json({ message: "Attendance changed. Reload before checking in." }, { status: 409 });
+    }
+    return NextResponse.json(attendance, { status: 201 });
+  }
+
+  try {
+    const attendance = await prisma.attendanceLog.create({
         data: {
           booking_id: booking.id,
           recorded_by: user.id,
           status: "present",
           check_in_at: now,
         },
-      });
-
-  return NextResponse.json(attendance, { status: 201 });
+    });
+    return NextResponse.json(attendance, { status: 201 });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ message: "Attendance changed. Reload before checking in." }, { status: 409 });
+    }
+    throw error;
+  }
 }

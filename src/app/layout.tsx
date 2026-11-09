@@ -22,7 +22,11 @@ export default async function RootLayout({
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <AuthSessionBoundary key={user?.id ?? "anonymous"} userId={user?.id ?? null}>
+        <AuthSessionBoundary
+          key={user?.id ?? "anonymous"}
+          userId={user?.id ?? null}
+          sessionStartedAt={user?.last_sign_in_at}
+        >
           <AppHeader />
           <main
             id="main-content"

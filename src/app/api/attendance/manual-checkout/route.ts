@@ -57,12 +57,16 @@ export async function PATCH(request: Request) {
       status: "present",
       check_in_at: checkInAt,
       check_out_at: checkOutAt,
+      verified_at: new Date(),
+      verified_by: user.id,
     },
     update: {
       recorded_by: user.id,
       status: "present",
       check_in_at: checkInAt,
       check_out_at: checkOutAt,
+      verified_at: new Date(),
+      verified_by: user.id,
     },
   });
 

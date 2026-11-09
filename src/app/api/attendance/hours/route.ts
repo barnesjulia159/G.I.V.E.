@@ -4,10 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveProfile } from "@/lib/authorization";
 import { isActiveRole, managedOpportunityScope } from "@/lib/access-control";
 
-function calculateHours(checkIn: Date | null, checkOut: Date | null) {
-  if (!checkIn || !checkOut || checkOut <= checkIn) return 0;
-  return (checkOut.getTime() - checkIn.getTime()) / 3_600_000;
-}
+import { confirmedAttendanceHours } from "@/lib/event-report";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -77,6 +74,7 @@ export async function GET(request: Request) {
   const data = [
     ...bookings.map((booking) => {
       const attendance = booking.attendanceLog;
+      const verificationPending = Boolean(attendance?.check_out_at && attendance.status === "present" && !attendance.verified_at && booking.hours_override === null);
 
       return {
         id: attendance?.id ?? booking.id,
@@ -84,13 +82,14 @@ export async function GET(request: Request) {
         volunteerId: booking.volunteer_id,
         opportunityId: booking.opportunity_id,
         opportunityTitle: booking.opportunity.title,
-        status: attendance?.status ?? booking.status,
+        status: verificationPending ? "pending_approval" : attendance?.status ?? booking.status,
+        verificationPending,
         source: "attendance" as const,
         hoursOverridden: booking.hours_override !== null,
         checkInAt: attendance?.check_in_at ?? null,
         checkOutAt: attendance?.check_out_at ?? null,
         recordedAt: attendance?.recorded_at ?? booking.booked_at,
-        hours: booking.hours_override ?? calculateHours(attendance?.check_in_at ?? null, attendance?.check_out_at ?? null),
+        hours: booking.hours_override ?? confirmedAttendanceHours(attendance),
         notes: booking.hours_override_notes ?? attendance?.notes ?? booking.notes,
       };
     }),

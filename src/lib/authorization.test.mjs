@@ -6,10 +6,20 @@ import ts from "typescript";
 import * as accessControl from "./access-control.ts";
 import { isTrustedRequest } from "./request-security.ts";
 import pg from "pg";
+import * as opportunityValidation from "./opportunity-validation.ts";
+import { MIN_PASSWORD_LENGTH, registrationInputError } from "./auth-validation.ts";
+import { buildEventReport, confirmedAttendanceHours } from "./event-report.ts";
 
 // Execute the actual server modules with isolated auth/database boundaries,
 // without starting Next.js or connecting unit tests to the application database.
 async function loadServerModule(path, imports) {
+  imports["@/lib/auth-validation"] = { MIN_PASSWORD_LENGTH, registrationInputError };
+  imports["@/lib/event-report"] = { confirmedAttendanceHours };
+  imports["@/lib/opportunity-validation"] = {
+    ...opportunityValidation,
+    hasValidOpportunitySchedule: () => true,
+    ...imports["@/lib/opportunity-validation"],
+  };
   if (path.startsWith("./actions/") && ["./actions/bookings.ts", "./actions/opportunities.ts"].includes(path)) {
     imports["@/lib/opportunity-cache"] = await loadServerModule("./opportunity-cache.ts", {
       "next/cache": imports["next/cache"],
@@ -42,7 +52,90 @@ const opportunityPaths = [
   `/nonprofit/opportunities/${objectId}/edit`,
   `/nonprofit/opportunities/${objectId}/participants`,
   "/nonprofit/reports", "/volunteer/dashboard", "/admin/bookings",
+  "/organizations/[id]",
 ];
+
+test("invalid registration inputs fail before provider or duplicate lookup access", async () => {
+  for (const fields of [
+    { email: "", password: "" }, { email: "not-an-email", password: "abcdef" },
+    { email: "hello@example.org", password: "12345" },
+    { email: "hello@example.org", password: "      " },
+    { email: "hello@example.org", password: "abcdef", role: "admin" },
+  ]) {
+    const actions = await loadServerModule("./actions/auth.ts", {
+      "next/headers": {}, "next/navigation": navigation, "next/cache": {},
+      "@/lib/supabase/server": { createClient: () => assert.fail("Invalid registration must not call provider") },
+      "@/lib/prisma": { prisma: { users: { findFirst: () => assert.fail("Invalid registration must not query users") } } },
+      "@/lib/role-routing": {}, "@/lib/login-rate-limit": {},
+    });
+    const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => form.set(key, value));
+    await assert.rejects(actions.signUp(form), (error) => error.location?.startsWith("/register?error="));
+  }
+});
+
+test("registration handles duplicate lookup and provider duplicate responses without claiming success", async (t) => {
+  t.mock.method(console, "error", () => {});
+  for (const duplicateMode of ["lookup", "error", "identities", "none"]) {
+    let providerCalls = 0;
+    let syncCalls = 0;
+    const actions = await loadServerModule("./actions/auth.ts", {
+      "next/headers": {}, "next/navigation": navigation, "next/cache": {},
+      "@/lib/supabase/server": { createClient: async () => ({ auth: {
+        signUp: async ({ email, password, options }) => {
+          providerCalls++;
+          assert.equal(email, "Hello@example.org");
+          assert.equal(password, "abcdef");
+          assert.equal(options.data.role, "volunteer");
+          return duplicateMode === "error"
+            ? { data: {}, error: { code: "user_already_exists", message: "Duplicate" } }
+            : { data: { user: { id: userId, email, identities: duplicateMode === "identities" ? [] : [{ id: userId }] } }, error: null };
+        },
+      } }) },
+      "@/lib/prisma": { prisma: {
+        users: { findFirst: async ({ where }) => {
+          assert.equal(where.email.mode, "insensitive");
+          return duplicateMode === "lookup" ? { id: userId } : null;
+        } },
+        profile: { updateMany: async () => { syncCalls++; } },
+      } },
+      "@/lib/role-routing": {}, "@/lib/login-rate-limit": {},
+    });
+    const form = new FormData();
+    form.set("email", " Hello@example.org ");
+    form.set("password", "abcdef");
+    await assert.rejects(actions.signUp(form), (error) =>
+      decodeURIComponent(error.location ?? "").includes(duplicateMode === "none" ? "Account created" : "already exists"));
+    assert.equal(providerCalls, duplicateMode === "lookup" ? 0 : 1);
+    assert.equal(syncCalls, duplicateMode === "none" ? 1 : 0);
+  }
+});
+
+test("published edits reject missing title and invalid schedules before tenant queries", async () => {
+  for (const invalid of [
+    { title: "" }, { start_at: "" }, { end_at: "" }, { start_at: "garbled" },
+    { end_at: "2099-01-01T10:00" }, { end_at: "2099-01-01T09:00" },
+  ]) {
+    const actions = await loadServerModule("./actions/opportunities.ts", {
+      "next/navigation": navigation, "next/cache": {},
+      "@/lib/authorization": { requireNonprofitOrganization: async () => ({
+        supabase: { from: () => assert.fail("Invalid publication must not access database") },
+        user: { id: userId }, organization: { id: "org-a" },
+      }) },
+      "@/lib/prisma": { prisma: {} }, "@/lib/date-format": {},
+      "@/lib/opportunity-validation": opportunityValidation,
+    });
+    const form = new FormData();
+    for (const [key, value] of Object.entries({
+      opportunity_id: objectId, submit_action: "publish", title: "Event",
+      start_at: "2099-01-01T10:00", end_at: "2099-01-01T11:00",
+      description: "Volunteers help plant flowers and maintain the community garden.",
+      location_name: "Community Center", capacity: "10", ...invalid,
+    })) form.set(key, value);
+    await assert.rejects(actions.updateOpportunity(form), (error) =>
+      decodeURIComponent(error.location ?? "").includes("require a title and valid start and end times"));
+  }
+});
 
 async function authActions(auth, invalidations = []) {
   return loadServerModule("./actions/auth.ts", {
@@ -481,6 +574,7 @@ test("private account guard accepts only verified active accounts with the requi
 
     test("session changes hide personalized UI and discard cached navigation", async () => {
       const previousWindow = globalThis.window;
+      const previousDocument = globalThis.document;
       const handlers = new Map();
       let effect;
       let sessionCallback;
@@ -488,25 +582,32 @@ test("private account guard accepts only verified active accounts with the requi
       let blocked = false;
       let unsubscribed = false;
       globalThis.window = {
-        location: { reload: () => reloads++ },
+        location: { reload: () => reloads++, replace: () => reloads++ },
+        localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
         addEventListener: (name, handler) => handlers.set(name, handler),
         removeEventListener: name => handlers.delete(name),
         setInterval: () => 1,
         clearInterval: () => {},
+        setTimeout: () => 2,
+        clearTimeout: () => {},
       };
+      globalThis.document = { addEventListener() {}, removeEventListener() {} };
       try {
         const boundary = await loadServerModule("../components/AuthSessionBoundary.tsx", {
           react: {
             useState: () => [blocked, value => { blocked = value; }],
+            useRef: initial => ({ current: initial }),
             useEffect: callback => { effect = callback; },
           },
           "react/jsx-runtime": { jsx: () => "blocked" },
+          "next/navigation": { usePathname: () => "/volunteer/dashboard" },
           "@/lib/supabase/client": { createClient: () => ({ auth: {
             onAuthStateChange: callback => {
               sessionCallback = callback;
               return { data: { subscription: { unsubscribe: () => { unsubscribed = true; } } } };
             },
             getUser: async () => ({ data: { user: null }, error: null }),
+            signOut: async () => ({ error: null }),
           } }) },
         });
         assert.equal(boundary.AuthSessionBoundary({ userId, children: "personal data" }), "personal data");
@@ -526,6 +627,8 @@ test("private account guard accepts only verified active accounts with the requi
       } finally {
         if (previousWindow === undefined) delete globalThis.window;
         else globalThis.window = previousWindow;
+        if (previousDocument === undefined) delete globalThis.document;
+        else globalThis.document = previousDocument;
       }
     });
 test("notification refresh rejection clears private data and older requests cannot restore it", async () => {
@@ -598,6 +701,102 @@ function opportunityClient({ previous, updated, updateError = null }) {
   };
 }
 
+test("create and edit enforce the real description and location rules before publishing", async () => {
+  for (const actionName of ["createOpportunity", "updateOpportunity"]) {
+    for (const invalid of [
+      { description: "a".repeat(49), error: "at least 50 characters" },
+      { description: " ".repeat(60), error: "description" },
+      { location_name: "", error: "before publishing" },
+      { location_name: "TBD", error: "before publishing" },
+    ]) {
+      let databaseCalls = 0;
+      const actions = await loadServerModule("./actions/opportunities.ts", {
+        "next/navigation": navigation,
+        "next/cache": { revalidatePath: () => assert.fail("Invalid publication must not invalidate caches") },
+        "@/lib/authorization": { requireNonprofitOrganization: async () => ({
+          supabase: { from: () => { databaseCalls++; assert.fail("Validation must run before database access"); } },
+          user: { id: userId }, organization: { id: "org-a" },
+        }) },
+        "@/lib/prisma": { prisma: {} },
+        "@/lib/date-format": {},
+      });
+      const form = new FormData();
+      for (const [key, value] of Object.entries({
+        opportunity_id: objectId, submit_action: "publish", title: "Community event",
+        description: "Volunteers help plant flowers and maintain the community garden.",
+        location_name: "Community Center", start_at: "2099-01-01T10:00:00Z",
+        end_at: "2099-01-01T12:00:00Z", capacity: "10", ...invalid,
+      })) if (key !== "error") form.set(key, value);
+      await assert.rejects(actions[actionName](form), (error) =>
+        decodeURIComponent(error.location ?? "").includes(invalid.error));
+      assert.equal(databaseCalls, 0);
+    }
+  }
+});
+
+test("valid physical and remote publications pass; drafts keep incomplete location and description editable", async () => {
+  for (const fields of [
+    { location_name: "Community Center" },
+    { address_line1: "10 Main St" },
+    { city: "Seattle" },
+    { is_virtual: "true" },
+    { submit_action: "draft", description: "Notes", location_name: "TBD" },
+  ]) {
+    const saved = {
+      id: objectId, title: "Event", status: fields.submit_action === "draft" ? "draft" : "published",
+      start_at: "2099-01-01T10:00:00Z", end_at: "2099-01-01T12:00:00Z",
+      ...fields, is_virtual: fields.is_virtual === "true",
+    };
+    const supabase = opportunityClient({ previous: { ...saved, status: "draft" }, updated: saved });
+    const actions = await loadServerModule("./actions/opportunities.ts", {
+      "next/navigation": navigation,
+      "next/cache": { revalidatePath: () => {} },
+      "@/lib/authorization": { requireNonprofitOrganization: async () => ({
+        supabase, user: { id: userId }, organization: { id: "org-a" },
+      }) },
+      "@/lib/prisma": { prisma: { profile: { findMany: async () => [] } } },
+      "@/lib/date-format": { formatDate: (value) => value },
+    });
+    const form = new FormData();
+    for (const [key, value] of Object.entries({
+      opportunity_id: objectId, submit_action: "publish", title: "Event",
+      description: "Volunteers help plant flowers and maintain the community garden.",
+      start_at: saved.start_at, end_at: saved.end_at, capacity: "10", ...fields,
+    })) form.set(key, value);
+    await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
+    assert.equal(supabase.calls.length, 2);
+  }
+});
+
+test("changing between physical and virtual venues notifies booked volunteers", async () => {
+  const previous = {
+    id: objectId, title: "Event", status: "published", is_virtual: false,
+    location_name: "Community Center", city: "Town",
+    start_at: "2099-01-01T10:00:00Z", end_at: "2099-01-01T12:00:00Z",
+  };
+  const supabase = opportunityClient({ previous, updated: { ...previous, is_virtual: true } });
+  let notifications;
+  const actions = await loadServerModule("./actions/opportunities.ts", {
+    "next/navigation": navigation, "next/cache": { revalidatePath: () => {} },
+    "@/lib/authorization": { requireNonprofitOrganization: async () => ({
+      supabase, user: { id: userId }, organization: { id: "org-a" },
+    }) },
+    "@/lib/prisma": { prisma: {
+      booking: { findMany: async () => [{ volunteer_id: "volunteer" }] },
+      notification: { createMany: async ({ data }) => { notifications = data; } },
+    } },
+    "@/lib/date-format": { formatDate: (value) => value, formatDateTimeRange: () => "time" },
+  });
+  const form = new FormData();
+  for (const [key, value] of Object.entries({
+    opportunity_id: objectId, submit_action: "publish", title: "Event", capacity: "10", is_virtual: "true",
+    description: "Volunteers help plant flowers and maintain the community garden.",
+  })) form.set(key, value);
+  await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
+  assert.ok(notifications[0].message.includes("Location changed."));
+  assert.ok(notifications[0].message.includes("Updated location: Virtual"));
+});
+
 test("foreign and zero-row opportunity updates never query participants or send notifications", async () => {
   for (const previous of [null, { id: objectId, status: "published" }]) {
     const supabase = opportunityClient({ previous, updated: null });
@@ -623,6 +822,7 @@ test("foreign and zero-row opportunity updates never query participants or send 
     const form = new FormData();
     form.set("opportunity_id", objectId);
     form.set("submit_action", "publish");
+    form.set("title", "Event");
     form.set("capacity", "10");
     await assert.rejects(actions.updateOpportunity(form), (error) => error.location.includes("access denied"));
     assert.equal(privilegedCalls, 0);
@@ -804,6 +1004,7 @@ test("publication transitions invalidate all affected views immediately after pe
     const form = new FormData();
     form.set("opportunity_id", objectId);
     form.set("submit_action", action);
+    form.set("title", "Event");
     form.set("capacity", "10");
     await assert.rejects(
       action === "archive" ? actions.archiveOpportunity(form) : actions.updateOpportunity(form),
@@ -882,7 +1083,7 @@ test("public listing and detail read the live visibility view without caching fo
     auth: { getUser: async () => ({ data: { user: null } }) },
     from(table) {
       const query = {
-        select() { return query; }, order() { return query; }, eq() { return query; },
+        select() { return query; }, order() { return query; }, eq() { return query; }, range() { return query; },
         gt() { return query; },
         then(resolve, reject) {
           if (table !== "public_opportunity_listings") return Promise.resolve({ data: [], error: null }).then(resolve, reject);
@@ -942,7 +1143,7 @@ test("public discovery excludes past and exactly-started events while retaining 
       assert.deepEqual(options, { noStore: true });
       return { from(table) {
         const query = {
-          select() { return query; }, order() { return query; },
+          select() { return query; }, order() { return query; }, range() { return query; },
           gt(column, value) {
             assert.equal(table, "public_opportunity_listings");
             assert.equal(column, "start_at");
@@ -985,7 +1186,7 @@ test("local time display uses browser timezone and a deterministic UTC hydration
   assert.equal(display.LocalDateTime({ value }), "November 4, 2026, 8:00 PM EST");
   assert.equal(display.LocalDateTime({ value, dateOnly: true }), "November 4, 2026");
   assert.equal(display.LocalDateTime({ value, end: "2026-11-05T02:00:00Z" }),
-    "November 4, 2026, 8:00 PM-9:00 PM EST");
+    "November 4, 2026, 8:00 PM - 9:00 PM EST");
 });
 
 const routeCases = [
@@ -1072,3 +1273,186 @@ test("self-service attendance reads and writes scope the reservation to the volu
     assert.equal(response.status, 404);
   }
 });
+
+async function attendanceHandler(path, prisma, role = "volunteer") {
+      return loadServerModule(path, {
+        "next/server": nextServer,
+        "@/lib/supabase/server": { createClient: async () => ({
+          auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
+        }) },
+        "@/lib/prisma": { prisma },
+        "@/lib/authorization": {
+          getActiveProfile: async () => ({ id: userId, role, isActive: true }),
+          managedOpportunityScope: () => ({ organization: { user_id: userId } }),
+        },
+        "@/lib/access-control": accessControl,
+      });
+    }
+
+    const attendanceRequest = (body) => new Request("http://localhost/api/attendance", {
+      method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" },
+    });
+
+    test("self check-in rejects times outside the event and never creates confirmed hours", async () => {
+      const now = Date.now();
+      for (const [start, end, expected] of [
+        [now + 3600000, now + 7200000, 409],
+        [now - 7200000, now - 3600000, 409],
+        [now - 3600000, now + 3600000, 201],
+      ]) {
+        let writes = 0;
+        const handler = await attendanceHandler("../app/api/attendance/check-in/route.ts", {
+          booking: { findFirst: async ({ select, where }) => {
+            assert.equal(where.volunteer_id, userId);
+            assert.ok(select.opportunity.select.start_at);
+            return {
+              id: objectId, volunteer_id: userId, status: "booked",
+              opportunity: { start_at: new Date(start), end_at: new Date(end), status: "published", is_deleted: false },
+            };
+          } },
+          attendanceLog: {
+            findUnique: async () => null,
+            create: async ({ data }) => {
+              writes++;
+              assert.equal(data.verified_at ?? null, null);
+              assert.equal(data.verified_by ?? null, null);
+              return { ...data, id: "attendance", verified_at: null, verified_by: null };
+            },
+          },
+        });
+        const response = await handler.POST(attendanceRequest({ bookingId: objectId }));
+        assert.equal(response.status, expected);
+        assert.equal(writes, expected === 201 ? 1 : 0);
+      }
+    });
+
+    test("self checkout is bounded by event end and cannot race past organizer confirmation", async () => {
+      const now = Date.now();
+      const session = {
+        id: "attendance", check_in_at: new Date(now - 90 * 60000), check_out_at: null, verified_at: null,
+        booking: {
+          volunteer_id: userId, status: "booked",
+          opportunity: { start_at: new Date(now - 2 * 3600000), end_at: new Date(now - 30 * 60000), is_deleted: false },
+        },
+      };
+      for (const concurrentConfirmation of [false, true]) {
+        const handler = await attendanceHandler("../app/api/attendance/check-out/route.ts", {
+          attendanceLog: {
+            findFirst: async () => session,
+            updateManyAndReturn: async ({ where, data }) => {
+              assert.equal(where.verified_at, null);
+              assert.equal(where.check_out_at, null);
+              assert.equal(where.check_in_at, session.check_in_at);
+              assert.equal(data.check_out_at.getTime(), session.booking.opportunity.end_at.getTime());
+              assert.equal(data.verified_at, null);
+              assert.equal(data.verified_by, null);
+              return concurrentConfirmation ? [] : [{ ...session, ...data }];
+            },
+          },
+        });
+        const response = await handler.POST(attendanceRequest({ bookingId: objectId }));
+        assert.equal(response.status, concurrentConfirmation ? 409 : 200);
+      }
+    });
+
+    test("organizer approval confirms only reviewed completed present sessions and rejects concurrent timestamp changes", async () => {
+      const checkIn = new Date("2026-10-16T09:00:00Z");
+      const checkOut = new Date("2026-10-16T11:30:00Z");
+      for (const [status, checkout, concurrent, expectedHours] of [
+        ["present", checkOut, false, 2.5],
+        ["present", null, false, 0],
+        ["absent", checkOut, false, 0],
+        ["present", checkOut, true, null],
+      ]) {
+        let confirmed;
+        const handler = await attendanceHandler("../app/api/attendance/record/route.ts", {
+          booking: { findFirst: async ({ where }) => {
+            assert.deepEqual(where.opportunity.organization, { user_id: userId });
+            return { id: objectId, status: "booked", opportunity: { organization: { user_id: userId } } };
+          } },
+          attendanceLog: {
+            findUnique: async () => ({ id: "attendance", check_in_at: checkIn, check_out_at: checkout }),
+            updateManyAndReturn: async ({ where, data }) => {
+              assert.equal(where.check_in_at, checkIn);
+              assert.equal(where.check_out_at, checkout);
+              assert.equal(Boolean(data.verified_at), status === "present" && checkout !== null);
+              assert.equal(data.verified_by, status === "present" && checkout ? userId : null);
+              confirmed = { ...data, check_in_at: checkIn, check_out_at: checkout };
+              return concurrent ? [] : [confirmed];
+            },
+          },
+        }, "nonprofit");
+        const response = await handler.POST(attendanceRequest({ bookingId: objectId, status }));
+        assert.equal(response.status, concurrent ? 409 : 201);
+        if (!concurrent) assert.equal(confirmedAttendanceHours(confirmed), expectedHours);
+      }
+    });
+
+    test("confirmed attendance cannot be overwritten by volunteer check-in or checkout", async () => {
+      const now = Date.now();
+      const confirmed = {
+        id: "attendance", check_in_at: new Date(now - 1800000), check_out_at: new Date(now - 60000),
+        verified_at: new Date(now), verified_by: "organizer",
+      };
+      const booking = {
+        id: objectId, volunteer_id: userId, status: "booked",
+        opportunity: { start_at: new Date(now - 3600000), end_at: new Date(now + 3600000), status: "published", is_deleted: false },
+      };
+      for (const path of ["../app/api/attendance/check-in/route.ts", "../app/api/attendance/check-out/route.ts"]) {
+        const handler = await attendanceHandler(path, {
+          booking: { findFirst: async () => booking },
+          attendanceLog: {
+            findUnique: async () => confirmed,
+            findFirst: async () => ({ ...confirmed, booking }),
+            create: () => assert.fail("Confirmed sessions are immutable to volunteers"),
+            updateManyAndReturn: () => assert.fail("Confirmed sessions are immutable to volunteers"),
+          },
+        });
+
+        assert.equal((await handler.POST(attendanceRequest({ bookingId: objectId }))).status, 409);
+      }
+    });
+
+test("volunteer and organizer totals agree on pending, confirmed, manual and overridden hours", async () => {
+          const checkIn = new Date("2026-10-16T09:00:00Z");
+          const checkOut = new Date("2026-10-16T11:30:00Z");
+          for (const [confirmed, override, manual, expected] of [
+            [false, null, 0, 0], [true, null, 0, 2.5], [true, null, 1, 3.5], [true, 0, 1, 0],
+          ]) {
+            const booking = {
+              id: "booking", volunteer_id: userId, opportunity_id: objectId, status: "booked",
+              booked_at: checkIn, notes: null, hours_override: override, hours_override_notes: null,
+              opportunity: { title: "Event" },
+              attendanceLog: {
+                id: "attendance", status: "present", notes: null, recorded_at: checkOut,
+                check_in_at: checkIn, check_out_at: checkOut,
+                verified_at: confirmed ? checkOut : null, verified_by: confirmed ? "organizer" : null,
+              },
+            };
+            const entries = manual ? [{
+              id: "manual", volunteer_id: userId, opportunity_id: objectId, hours: manual,
+              notes: "Setup", recorded_at: checkOut, opportunities: { title: "Event" },
+            }] : [];
+            for (const role of ["volunteer", "nonprofit"]) {
+              const handler = await attendanceHandler("../app/api/attendance/hours/route.ts", {
+                opportunity: { findFirst: async ({ where }) => {
+                  assert.deepEqual(where.organization, { user_id: userId });
+                  return { id: objectId };
+                } },
+                booking: { findMany: async ({ where }) => {
+                  assert.equal(where.status.not, "cancelled");
+                  if (role === "volunteer") assert.equal(where.volunteer_id, userId);
+                  else assert.deepEqual(where.opportunity.organization, { user_id: userId });
+                  return [booking];
+                } },
+                volunteer_hours: { findMany: async () => entries },
+              }, role);
+              const response = await handler.GET(new Request(`http://localhost/api/attendance/hours${role === "nonprofit" ? `?opportunityId=${objectId}` : ""}`));
+              assert.equal(response.status, 200);
+              const result = await response.json();
+              assert.equal(result.totalHours, expected);
+              assert.equal(result.totalHours, buildEventReport([booking], entries, []).totalHours);
+              assert.equal(result.data[0].verificationPending, !confirmed && override === null);
+            }
+          }
+        });

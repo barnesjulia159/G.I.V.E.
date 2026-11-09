@@ -32,10 +32,33 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  const isPrefetch = request.headers.has("next-router-prefetch") ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("sec-purpose")?.includes("prefetch");
+  const isHomeVisit = request.method === "GET" && request.nextUrl.pathname === "/" && !isPrefetch;
+
   // Refreshes an expired access token so the user stays signed in.
   try {
-    await supabase.auth.getUser();
-  } catch {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && isHomeVisit) {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) {
+        console.error("Home-page sign-out failed:", error);
+        return new NextResponse("Sign-out could not be confirmed. Please reload to retry before using this device.", {
+          status: 503,
+          headers: { "Cache-Control": "private, no-store" },
+        });
+      }
+      response.headers.set("Cache-Control", "private, no-store");
+    }
+  } catch (error) {
+    if (isHomeVisit) {
+      console.error("Home-page session verification or sign-out failed:", error);
+      return new NextResponse("Your session could not be verified. Please reload to retry.", {
+        status: 503,
+        headers: { "Cache-Control": "private, no-store" },
+      });
+    }
     // Network failures shouldn't block the request or clear the session.
   }
 

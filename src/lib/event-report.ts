@@ -1,3 +1,16 @@
+export function confirmedAttendanceHours(attendance: {
+  status: string;
+  verified_at?: Date | null;
+  verified_by?: string | null;
+  check_in_at: Date | null;
+  check_out_at: Date | null;
+} | null | undefined) {
+  if (!attendance?.verified_at || !attendance.verified_by || attendance.status !== "present") return 0;
+  const { check_in_at: checkIn, check_out_at: checkOut } = attendance;
+  if (!checkIn || !checkOut || checkOut <= checkIn) return 0;
+  return (checkOut.getTime() - checkIn.getTime()) / 3_600_000;
+}
+
 type ReportBooking = {
   id: string;
   volunteer_id: string;
@@ -6,6 +19,8 @@ type ReportBooking = {
   hours_override_notes: string | null;
   notes: string | null;
   attendanceLog: {
+    verified_at?: Date | null;
+    verified_by?: string | null;
     status: string;
     check_in_at: Date | null;
     check_out_at: Date | null;
@@ -45,11 +60,7 @@ export function buildEventReport(
       if (booking.hours_override !== null) {
         overrideHours += booking.hours_override;
       } else {
-        const checkIn = booking.attendanceLog?.check_in_at;
-        const checkOut = booking.attendanceLog?.check_out_at;
-        if (checkIn && checkOut && checkOut > checkIn) {
-          attendanceHours += (checkOut.getTime() - checkIn.getTime()) / 3_600_000;
-        }
+        attendanceHours += confirmedAttendanceHours(booking.attendanceLog);
       }
     }
     const manualHours = hasOverride ? 0 : entries.reduce((sum, entry) => sum + entry.hours, 0);

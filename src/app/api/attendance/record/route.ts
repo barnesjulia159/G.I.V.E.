@@ -59,6 +59,22 @@ export async function POST(request: Request) {
   }
 
   const recordedAt = new Date();
+  const existing = await prisma.attendanceLog.findUnique({ where: { booking_id: booking.id } });
+  const completed = existing?.check_in_at && existing.check_out_at && existing.check_out_at > existing.check_in_at;
+  const confirmation = {
+    verified_at: status === "present" && completed ? recordedAt : null,
+    verified_by: status === "present" && completed ? user.id : null,
+  };
+  if (existing) {
+    const [attendance] = await prisma.attendanceLog.updateManyAndReturn({
+      where: { id: existing.id, check_in_at: existing.check_in_at, check_out_at: existing.check_out_at },
+      data: { recorded_by: user.id, status: status as AttendanceStatus, notes, recorded_at: recordedAt, ...confirmation },
+    });
+    if (!attendance) {
+      return NextResponse.json({ message: "Session times changed. Reload and review before confirming." }, { status: 409 });
+    }
+    return NextResponse.json(attendance, { status: 201 });
+  }
   const attendance = await prisma.attendanceLog.upsert({
     where: { booking_id: booking.id },
     create: {
@@ -67,12 +83,16 @@ export async function POST(request: Request) {
       status: status as AttendanceStatus,
       notes,
       recorded_at: recordedAt,
+      verified_at: null,
+      verified_by: null,
     },
     update: {
       recorded_by: user.id,
       status: status as AttendanceStatus,
       notes,
       recorded_at: recordedAt,
+      verified_at: null,
+      verified_by: null,
     },
   });
 

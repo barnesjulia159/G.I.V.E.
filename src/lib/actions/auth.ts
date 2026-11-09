@@ -8,6 +8,7 @@ import { UserRole } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import { getDashboardPath } from "@/lib/role-routing";
 import { consumeLoginAttempt } from "@/lib/login-rate-limit";
+import { MIN_PASSWORD_LENGTH, registrationInputError } from "@/lib/auth-validation";
 
 function authErrorMessage(error: { message?: string; status?: number }) {
   const message = error.message?.trim();
@@ -85,8 +86,9 @@ export async function signUp(formData: FormData) {
   const lastName = String(formData.get("last_name") || "").trim();
   const role = String(formData.get("role") || "volunteer") as UserRole;
 
-  if (!email || !password) {
-    redirect("/register?error=Email and password are required.");
+  const inputError = registrationInputError(email, password, role);
+  if (inputError) {
+    redirect(`/register?error=${encodeURIComponent(inputError)}`);
   }
 
   const duplicateMessage = "An account with this email already exists. Please log in instead.";
@@ -204,7 +206,7 @@ export async function updatePassword(formData: FormData) {
   const password = String(formData.get("password") || "");
   const confirmPassword = String(formData.get("confirm_password") || "");
 
-  if (password.length < 6) {
+  if (password.trim().length < MIN_PASSWORD_LENGTH) {
     redirect("/reset-password?error=Password must be at least 6 characters.");
   }
 

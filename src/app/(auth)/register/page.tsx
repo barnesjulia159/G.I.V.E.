@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signUp } from "@/lib/actions/auth";
 import { SubmitButton } from "@/components/SubmitButton";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth-validation";
 
 type RegisterPageProps = {
   searchParams: Promise<{
@@ -30,7 +31,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
           <p>Choose how you would like to take part.</p>
         </header>
 
-        {params.error && <p className="alert-error mt-4">{params.error}</p>}
+        {params.error && <p role="alert" className="alert-error mt-4">{params.error}</p>}
 
         <form action={signUp} className="auth-form">
           <div className="auth-name-fields">
@@ -70,7 +71,8 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             <label htmlFor="password" className="form-label">
               Password
             </label>
-            <input id="password" name="password" type="password" autoComplete="new-password" required className="form-input" />
+            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} aria-describedby="password-help" className="form-input" />
+            <p id="password-help" className="text-sm text-slate-600">Use at least {MIN_PASSWORD_LENGTH} characters. Leading and trailing spaces do not count toward this minimum.</p>
           </div>
 
           <SubmitButton className="auth-submit">Create Account</SubmitButton>

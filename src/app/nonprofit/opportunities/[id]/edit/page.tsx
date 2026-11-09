@@ -77,11 +77,11 @@ async function EditOpportunityContent({
         <dl className="mt-6 grid gap-4 border-y border-slate-200 py-4 sm:grid-cols-2">
           <div>
             <dt className="text-sm font-medium text-slate-500">Requested skills</dt>
-            <dd className="text-slate-700">{skillNames.length ? skillNames.join(", ") : "None specified"}</dd>
+            <dd className="text-slate-700">{skillNames.length ? skillNames.join(", ") : "No skills listed by the organization."}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-slate-500">Related causes</dt>
-            <dd className="text-slate-700">{causeNames.length ? causeNames.join(", ") : "None specified"}</dd>
+            <dd className="text-slate-700">{causeNames.length ? causeNames.join(", ") : "No causes listed by the organization."}</dd>
           </div>
         </dl>
       )}
@@ -194,6 +194,9 @@ async function EditOpportunityContent({
           <input type="checkbox" name="is_virtual" value="true" defaultChecked={opportunity.is_virtual} />
           Remote / virtual event
         </label>
+        <p className="text-sm text-slate-600">
+          To publish, add a venue, street address, or city, or mark this event as remote. Placeholder locations such as TBD are not sufficient.
+        </p>
 
         <div className="form-field">
           <label htmlFor="address_line1" className="form-label">

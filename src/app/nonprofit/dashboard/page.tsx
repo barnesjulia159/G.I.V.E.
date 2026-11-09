@@ -136,6 +136,13 @@ async function NonprofitDashboardContent({
             Edit Organization Profile
           </Link>
 
+          <Link
+            href={`/organizations/${org.id}`}
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-100"
+          >
+            View Public Organization Page
+          </Link>
+
           <form action={signOut} className="ml-auto">
             <button type="submit" className="dashboard-signout">
               Sign out

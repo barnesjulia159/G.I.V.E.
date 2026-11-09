@@ -11,6 +11,7 @@ type OpportunitiesPageProps = {
     skill?: string | string[];
     cause?: string | string[];
     error?: string;
+    page?: string;
   }>;
 };
 
@@ -24,6 +25,12 @@ export default async function OpportunitiesPage({
   const date = params.date || "";
   const selectedSkills = Array.isArray(params.skill) ? params.skill : params.skill ? [params.skill] : [];
   const selectedCauses = Array.isArray(params.cause) ? params.cause : params.cause ? [params.cause] : [];
+  const pageSize = 24;
+  const pageNumber = params.page === undefined ? 1 : Number(params.page);
+  const validPage = params.page === undefined ||
+    (/^[1-9]\d*$/.test(params.page) && Number.isSafeInteger(pageNumber) && pageNumber <= 100000);
+  const currentPage = validPage ? pageNumber : 1;
+  const offset = (currentPage - 1) * pageSize;
 
   const supabase = await createClient({ noStore: true });
   const [{ data: skills, error: skillsError }, { data: causes, error: causesError }] = await Promise.all([
@@ -50,16 +57,20 @@ export default async function OpportunitiesPage({
     .from("public_opportunity_listings")
     .select("*")
     .gt("start_at", new Date().toISOString())
-    .order("start_at", { ascending: true });
+    .order("start_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + pageSize);
 
   if (search) {
+    const literal = `%${search.replace(/\\/g, "\\\\").replace(/[%_]/g, "\\$&")}%`;
+    const pattern = JSON.stringify(literal);
     query = query.or(
-      `title.ilike.%${search}%,description.ilike.%${search}%,organization_name.ilike.%${search}%`
+      `title.ilike.${pattern},description.ilike.${pattern},organization_name.ilike.${pattern}`
     );
   }
 
   if (city) {
-    query = query.ilike("city", `%${city}%`);
+    query = query.ilike("city", `%${city.replace(/\\/g, "\\\\").replace(/[%_]/g, "\\$&")}%`);
   }
 
   if (validDate) {
@@ -78,11 +89,28 @@ export default async function OpportunitiesPage({
     selectedCauses.length === causeIds.length &&
     (!skillIds.length || matchingSkills.length > 0) &&
     (!causeIds.length || matchingCauses.length > 0);
-  const { data, error } = !filterError && hasMatches && (!date || validDate)
+  const invalidFilters =
+    !validPage ? "Choose a valid page number between 1 and 100000." :
+    date && !validDate ? "Choose a valid date." :
+    selectedSkills.length !== skillIds.length || selectedCauses.length !== causeIds.length
+      ? "One or more selected skills or causes are unavailable. Clear filters and choose current options." : null;
+  const { data, error } = !filterError && hasMatches && !invalidFilters
     ? await query
     : { data: null, error: null };
 
-  const opportunities = (data || []) as PublicOpportunityListing[];
+  const results = (data || []) as PublicOpportunityListing[];
+  const hasNextPage = results.length > pageSize;
+  const opportunities = results.slice(0, pageSize);
+  function pageHref(page: number) {
+    const queryParams = new URLSearchParams();
+    if (search) queryParams.set("search", search);
+    if (city) queryParams.set("city", city);
+    if (date) queryParams.set("date", date);
+    selectedSkills.forEach((skill) => queryParams.append("skill", skill));
+    selectedCauses.forEach((cause) => queryParams.append("cause", cause));
+    queryParams.set("page", String(page));
+    return `/opportunities?${queryParams.toString()}`;
+  }
 
   return (
     <section>
@@ -95,11 +123,12 @@ export default async function OpportunitiesPage({
         </p>
       </div>
 
-      {params.error && <p className="alert-error mb-4">{params.error}</p>}
-      {error && <p className="alert-error mb-4">{error.message}</p>}
-      {filterError && <p className="alert-error mb-4">Filters could not be loaded. Please try again.</p>}
+      {params.error && <p role="alert" className="alert-error mb-4">{params.error}</p>}
+      {error && <p role="alert" className="alert-error mb-4">{error.message}</p>}
+      {filterError && <p role="alert" className="alert-error mb-4">Filters could not be loaded. Please try again.</p>}
+      {invalidFilters && <p role="alert" className="alert-error mb-4">{invalidFilters}</p>}
 
-      <form className="opportunity-filters mb-8 grid grid-cols-1 gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-2">
+      <form key={JSON.stringify([search, city, date, selectedSkills, selectedCauses])} className="opportunity-filters mb-8 grid grid-cols-1 gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-2">
         <div className="form-field">
           <label htmlFor="search" className="form-label">
             Search
@@ -161,7 +190,7 @@ export default async function OpportunitiesPage({
         </div>
       </form>
 
-      {!error && !filterError && opportunities.length === 0 ? (
+      {!error && !filterError && !invalidFilters && opportunities.length === 0 ? (
         <div className="rounded-xl bg-white p-6 shadow-sm">
           <p className="text-slate-700">
             No volunteer opportunities match your search yet.
@@ -173,6 +202,13 @@ export default async function OpportunitiesPage({
             <OpportunityCard key={opportunity.id} opportunity={opportunity} />
           ))}
         </div>
+      )}
+      {!error && !filterError && !invalidFilters && (currentPage > 1 || hasNextPage) && (
+        <nav aria-label="Opportunity pages" className="mt-6 flex flex-wrap items-center justify-center gap-4">
+          {currentPage > 1 && <Link href={pageHref(currentPage - 1)} className="font-medium text-emerald-700 hover:underline">Previous page</Link>}
+          <span aria-current="page">Page {currentPage}</span>
+          {hasNextPage && <Link href={pageHref(currentPage + 1)} className="font-medium text-emerald-700 hover:underline">Next page</Link>}
+        </nav>
       )}
     </section>
   );

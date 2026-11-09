@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { RoleGate } from "@/components/RoleGate";
 import { SubmitButton } from "@/components/SubmitButton";
 import { saveOrganizationProfile } from "@/lib/actions/organizations";
@@ -38,11 +39,16 @@ async function NonprofitOrganizationContent({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: organization } = await supabase
+  const { data: organization, error: organizationError } = await supabase
     .from("organizations")
     .select("*")
     .eq("user_id", user!.id)
     .maybeSingle();
+
+  if (organizationError) {
+    console.error("Organization profile lookup failed:", organizationError);
+    throw new Error("Organization profile could not be loaded.");
+  }
 
   return (
     <section className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-sm">
@@ -51,6 +57,14 @@ async function NonprofitOrganizationContent({
         This information helps volunteers understand your mission and contact
         your organization.
       </p>
+      <p className="mt-2 text-sm text-slate-600">
+        Your mission, description, contact details, and address appear on your public organization page, alongside your published opportunities.
+      </p>
+      {organization && (
+        <Link href={`/organizations/${organization.id}`} className="mt-4 inline-flex font-medium text-emerald-700 hover:underline">
+          View public organization page
+        </Link>
+      )}
 
       {message && <p className="alert-info mt-4">{message}</p>}
       {error && <p className="alert-error mt-4">{error}</p>}

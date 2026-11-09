@@ -9,6 +9,8 @@ import {
   hasMinimumOpportunityDescription,
   hasValidOpportunityLocation,
   MIN_OPPORTUNITY_DESCRIPTION_LENGTH,
+  formatOpportunityLocation,
+  hasValidOpportunitySchedule,
 } from "@/lib/opportunity-validation";
 import { formatDate, formatDateTimeRange } from "@/lib/date-format";
 
@@ -65,7 +67,7 @@ async function notifyVolunteersOfPublishedOpportunity({
     const message = [
       `${title} is now available to book.`,
       `Date and time: ${formatDateTimeRange(startAt, endAt)}`,
-      `Location: ${location || "Location TBD"}`,
+      `Location: ${location}`,
     ].join("\n");
 
     await prisma.notification.createMany({
@@ -104,6 +106,10 @@ export async function createOpportunity(formData: FormData) {
 
   if (status === "published" && !hasMinimumOpportunityDescription(payload.description)) {
     redirect(`/nonprofit/opportunities/new?error=${encodeURIComponent(`Published opportunities need a description of at least ${MIN_OPPORTUNITY_DESCRIPTION_LENGTH} characters.`)}`);
+  }
+
+  if (!hasValidOpportunitySchedule(payload.start_at, payload.end_at)) {
+    redirect("/nonprofit/opportunities/new?error=Enter valid start and end times, with the end after the start.");
   }
 
   if (status === "published" && !hasValidOpportunityLocation({
@@ -158,7 +164,7 @@ export async function createOpportunity(formData: FormData) {
       title: payload.title,
       startAt: payload.start_at,
       endAt: payload.end_at,
-      location: [payload.location_name, payload.city, payload.state].filter(Boolean).join(", "),
+      location: formatOpportunityLocation(payload),
     });
     if (!notified) {
       redirect("/nonprofit/dashboard?error=Opportunity published, but volunteer notifications could not be sent.");
@@ -186,6 +192,10 @@ export async function updateOpportunity(formData: FormData) {
 
   const payload = getOpportunityPayload(formData, status);
 
+  if (status === "published" && (!payload.title || !hasValidOpportunitySchedule(payload.start_at, payload.end_at))) {
+    redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent("Published opportunities require a title and valid start and end times, with the end after the start.")}`);
+  }
+
   if (!Number.isSafeInteger(payload.capacity) || payload.capacity <= 0) {
     redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=Capacity must be a positive integer.`);
   }
@@ -205,7 +215,7 @@ export async function updateOpportunity(formData: FormData) {
 
   const { data: previousOpportunity, error: lookupError } = await supabase
     .from("opportunities")
-    .select("id, title, status, start_at, end_at, location_name, city, state")
+    .select("id, title, status, start_at, end_at, location_name, address_line1, city, state, is_virtual")
     .eq("id", opportunityId)
     .eq("organization_id", organization.id)
     .eq("is_deleted", false)
@@ -221,7 +231,7 @@ export async function updateOpportunity(formData: FormData) {
     .eq("id", opportunityId)
     .eq("organization_id", organization.id)
     .eq("is_deleted", false)
-    .select("id, title, status, start_at, end_at, location_name, city, state")
+    .select("id, title, status, start_at, end_at, location_name, address_line1, city, state, is_virtual")
     .maybeSingle();
 
   if (error) {
@@ -233,16 +243,8 @@ export async function updateOpportunity(formData: FormData) {
   invalidateOpportunityViews(updatedOpportunity.id);
 
   const becamePublished = previousOpportunity.status !== "published" && updatedOpportunity.status === "published";
-  const previousLocation = [
-    previousOpportunity?.location_name,
-    previousOpportunity?.city,
-    previousOpportunity?.state,
-  ]
-    .filter(Boolean)
-    .join(", ");
-  const updatedLocation = [updatedOpportunity.location_name, updatedOpportunity.city, updatedOpportunity.state]
-    .filter(Boolean)
-    .join(", ");
+  const previousLocation = formatOpportunityLocation(previousOpportunity);
+  const updatedLocation = formatOpportunityLocation(updatedOpportunity);
   const dateChanged =
     previousOpportunity &&
     formatDate(previousOpportunity.start_at) !== formatDate(updatedOpportunity.start_at);
@@ -289,7 +291,7 @@ export async function updateOpportunity(formData: FormData) {
       const updatedDetails = [
         `${updatedOpportunity.title} has been updated. ${changes}`,
         `Updated date and time: ${formatDateTimeRange(updatedOpportunity.start_at, updatedOpportunity.end_at)}`,
-        `Updated location: ${updatedLocation || "Location TBD"}`,
+        `Updated location: ${updatedLocation}`,
         "Please review your booking details and update your plans accordingly.",
       ].join("\n");
 
