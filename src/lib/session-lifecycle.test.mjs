@@ -17,7 +17,7 @@ async function load(path, imports, globals = {}) {
   return exports;
 }
 
-async function boundary({ pathname = "/volunteer/dashboard", userId = "user-a", sessionStartedAt, stored, logoutFailure = false, sessionUser = userId, verificationError = null, storageUnavailable = false } = {}) {
+async function boundary({ pathname = "/volunteer/dashboard", userId = "user-a", sessionStartedAt, stored, logoutFailure = false, sessionUser = userId, verificationError = null, storageUnavailable = false, getUser } = {}) {
   let now = 1_800_000_000_000;
   class Clock extends Date {
     static now() { return now; }
@@ -74,7 +74,10 @@ async function boundary({ pathname = "/volunteer/dashboard", userId = "user-a", 
         authCallback = callback;
         return { data: { subscription: { unsubscribe: () => { unsubscribed = true; } } } };
       },
-      getUser: async () => { verifyCalls++; return { data: { user: sessionUser ? { id: sessionUser } : null }, error: verificationError }; },
+      getUser: async () => {
+        verifyCalls++;
+        return getUser ? getUser() : { data: { user: sessionUser ? { id: sessionUser } : null }, error: verificationError };
+      },
       signOut: async (options) => {
         assert.equal(options.scope, "local");
         logoutCalls++;
@@ -82,7 +85,7 @@ async function boundary({ pathname = "/volunteer/dashboard", userId = "user-a", 
         return { error: logoutFailure ? new Error("offline") : null };
       },
     } }) },
-  }, { window: browserWindow, document: browserDocument, Date: Clock, console: { error: (...args) => errors.push(args) } });
+  }, { window: browserWindow, document: browserDocument, Date: Clock, CustomEvent, console: { error: (...args) => errors.push(args) } });
   const render = () => {
     index = 0;
     return module.AuthSessionBoundary({ userId, sessionStartedAt, children: "private content" });
@@ -99,6 +102,7 @@ async function boundary({ pathname = "/volunteer/dashboard", userId = "user-a", 
     setSessionUser: (value) => { sessionUser = value; },
     setPathname: (value) => { pathname = value; },
     retryLogout: () => { logoutFailure = false; },
+    emitAuth: (event, session) => authCallback(event, session),
     runEffect: () => effect(),
     get logoutCalls() { return logoutCalls; },
     get verifyCalls() { return verifyCalls; },
@@ -192,6 +196,103 @@ test("missing sessions sign out rather than refreshing private content", async (
   app.cleanup();
 });
 
+test("password reset submission suppresses in-flight checks and intentional sign-out events", async () => {
+  let resolveVerification;
+  const app = await boundary({
+    pathname: "/reset-password",
+    getUser: () => new Promise((resolve) => { resolveVerification = resolve; }),
+  });
+  const pending = app.windowEvents.get("give:password-reset-pending");
+  pending(new CustomEvent("give:password-reset-pending", { detail: true }));
+  app.emitAuth("SIGNED_OUT", null);
+  resolveVerification({ data: { user: null }, error: { name: "AuthSessionMissingError" } });
+  await app.flush();
+  await app.poll();
+  assert.equal(app.logoutCalls, 0);
+  assert.deepEqual(app.destinations, []);
+  assert.equal(app.verifyCalls, 1);
+  pending(new CustomEvent("give:password-reset-pending", { detail: false }));
+  assert.equal(app.verifyCalls, 2, "failed submissions resume verification");
+  resolveVerification({ data: { user: null }, error: { name: "AuthSessionMissingError" } });
+  await app.flush();
+  assert.equal(app.logoutCalls, 1);
+  app.cleanup();
+});
+
+test("password reset events cannot suppress checks on other pages", async () => {
+  const app = await boundary();
+  app.windowEvents.get("give:password-reset-pending")(new CustomEvent("give:password-reset-pending", { detail: true }));
+  app.setSessionUser(null);
+  await app.poll();
+  await app.flush();
+  assert.equal(app.logoutCalls, 1);
+  app.cleanup();
+});
+
+test("password reset form navigates after completion and resumes checks after errors", async () => {
+  for (const outcome of ["success", "validation", "network"]) {
+    const events = [];
+    const destinations = [];
+    const state = [];
+    let index = 0;
+    let calls = 0;
+    const formModule = await load("../components/ResetPasswordForm.tsx", {
+      react: {
+        useRef: (initial) => ({ current: initial }),
+        useState: (initial) => {
+          const slot = index++;
+          state[slot] ??= initial;
+          return [state[slot], (value) => { state[slot] = value; }];
+        },
+      },
+      "react/jsx-runtime": { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
+    }, {
+      CustomEvent,
+      AbortSignal,
+      fetch: async (url, options) => {
+        calls++;
+        assert.equal(url, "/api/auth/reset-password");
+        assert.equal(options.method, "POST");
+        assert.ok(options.signal instanceof AbortSignal);
+        if (outcome === "network") throw new Error("offline");
+        return { status: 200, json: async () => outcome === "success" ? { destination: "/login?message=updated" } : { error: "Passwords do not match." } };
+      },
+      window: { dispatchEvent: (event) => events.push(event.detail), location: { replace: (url) => destinations.push(url) } },
+      console: { error() {} },
+    });
+    const form = formModule.ResetPasswordForm();
+    await form.props.action(new FormData());
+    assert.equal(calls, 1);
+    if (outcome === "success") {
+      assert.deepEqual(events, [true]);
+      assert.deepEqual(destinations, ["/login?message=updated"]);
+    } else {
+      assert.deepEqual(events, [true, false]);
+      assert.deepEqual(destinations, []);
+      assert.match(state[1], outcome === "validation" ? /do not match/ : /may have changed/);
+      assert.equal(state[0], false);
+    }
+  }
+});
+
+test("password reset endpoint returns the action result without a page navigation", async () => {
+  const form = new FormData();
+  form.set("password", "new-password");
+  const endpoint = await load("../app/api/auth/reset-password/route.ts", {
+    "next/server": { NextResponse: { json: (body, options) => Response.json(body, options) } },
+    "@/lib/actions/auth": { updatePassword: async (data) => {
+      assert.equal(data.get("password"), "new-password");
+      return { destination: "/login?message=updated" };
+    } },
+  }, { console });
+  const response = await endpoint.POST(new Request("http://localhost/api/auth/reset-password", {
+    method: "POST", body: form,
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(await response.json(), { destination: "/login?message=updated" });
+});
+
 test("invalid or expired provider sessions clear authentication without a reload loop", async () => {
   for (const error of [{ status: 401 }, { status: 403 }, { name: "AuthSessionMissingError" }]) {
     const app = await boundary({ sessionUser: null, verificationError: error });
@@ -267,18 +368,27 @@ test("server home logout clears request and response cookies, and prefetch never
     headers: new Headers(headers),
     cookies: { getAll: () => [], set: (...args) => writes.push(["request", ...args]) },
   });
-  const response = await module.updateSession(request("/"));
+  const response = await module.updateSession(request("/", { "sec-fetch-dest": "document" }));
   assert.equal(logoutCalls, 1);
   assert.equal(response.headers.get("Cache-Control"), "private, no-store");
   assert.deepEqual(writes, [
     ["request", "auth-cookie", ""],
     ["response", "auth-cookie", "", { maxAge: 0 }],
   ]);
-  for (const headers of [{ "next-router-prefetch": "1" }, { purpose: "prefetch" }, { "sec-purpose": "prefetch;prerender" }]) {
+  for (const headers of [
+    { "sec-fetch-dest": "empty" },
+    { "sec-fetch-dest": "empty", "next-router-prefetch": "1" },
+    { "sec-fetch-dest": "document", "next-router-prefetch": "1" },
+    { "sec-fetch-dest": "document", purpose: "prefetch" },
+    { "sec-fetch-dest": "document", "sec-purpose": "prefetch;prerender" },
+    {},
+  ]) {
     await module.updateSession(request("/", headers));
   }
   await module.updateSession(request("/opportunities"));
   assert.equal(logoutCalls, 1);
+  await module.updateSession(request("/", { "sec-fetch-dest": "iframe" }));
+  assert.equal(logoutCalls, 2);
 });
 
 test("the inactivity deadline timer is rescheduled by input and cleared on unmount", async () => {
@@ -331,7 +441,7 @@ test("server home logout failures fail closed rather than rendering signed-in ho
       "next/server": { NextResponse: ResponseMock },
     }, { process: { env: {} }, console: { error: (...args) => errors.push(args) } });
     const response = await module.updateSession({
-      method: "GET", nextUrl: { pathname: "/" }, headers: new Headers(),
+      method: "GET", nextUrl: { pathname: "/" }, headers: new Headers({ "sec-fetch-dest": "document" }),
       cookies: { getAll: () => [] },
     });
     assert.equal(response.status, 503);

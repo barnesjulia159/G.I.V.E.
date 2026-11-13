@@ -375,13 +375,11 @@ test("recovery and authenticated password changes explicitly revoke all refresh 
         return { error: null };
       },
     }, invalidations);
-    await assert.rejects(actions.updatePassword(passwordForm()), (error) => {
-      const location = new URL(error.location, "http://localhost");
-      assert.equal(location.pathname, "/login");
-      assert.match(location.searchParams.get("message"), /all refresh sessions/);
-      assert.match(location.searchParams.get("message"), /access tokens remain valid/);
-      return true;
-    });
+    const result = await actions.updatePassword(passwordForm());
+    const location = new URL(result.destination, "http://localhost");
+    assert.equal(location.pathname, "/login");
+    assert.match(location.searchParams.get("message"), /all refresh sessions/);
+    assert.match(location.searchParams.get("message"), /access tokens remain valid/);
     assert.deepEqual(calls, ["password-updated", "global-signout"]);
     assert.deepEqual(invalidations, [["/", "layout"]]);
   }
@@ -401,14 +399,12 @@ test("failed revocation reports the already-changed password without claiming gl
   const errors = [];
   console.error = (...args) => errors.push(args);
   try {
-    await assert.rejects(actions.updatePassword(passwordForm()), (error) => {
-      const location = new URL(error.location, "http://localhost");
-      assert.equal(location.pathname, "/login");
-      assert.equal(location.searchParams.has("message"), false);
-      assert.match(location.searchParams.get("error"), /password was updated/);
-      assert.match(location.searchParams.get("error"), /could not confirm sign-out on all devices/);
-      return true;
-    });
+    const result = await actions.updatePassword(passwordForm());
+    const location = new URL(result.destination, "http://localhost");
+    assert.equal(location.pathname, "/login");
+    assert.equal(location.searchParams.has("message"), false);
+    assert.match(location.searchParams.get("error"), /password was updated/);
+    assert.match(location.searchParams.get("error"), /could not confirm sign-out on all devices/);
   } finally {
     console.error = originalError;
   }
@@ -429,12 +425,14 @@ test("invalid inputs, missing recovery users and rejected password updates never
     try {
       const form = scenario === "short" ? passwordForm("short")
         : scenario === "mismatch" ? passwordForm("new-password", "different") : passwordForm();
-      await assert.rejects(actions.updatePassword(form), (error) => {
-        const location = new URL(error.location, "http://localhost");
-        assert.equal(location.pathname, scenario === "expired" ? "/forgot-password" : "/reset-password");
+      const result = await actions.updatePassword(form);
+      if (scenario === "expired") {
+        const location = new URL(result.destination, "http://localhost");
+        assert.equal(location.pathname, "/forgot-password");
         assert.ok(location.searchParams.has("error"));
-        return true;
-      });
+      } else {
+        assert.ok(result.error);
+      }
     } finally {
       console.error = originalError;
     }

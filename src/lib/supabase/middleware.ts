@@ -32,10 +32,15 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const isPrefetch = request.headers.has("next-router-prefetch") ||
-    request.headers.get("purpose") === "prefetch" ||
-    request.headers.get("sec-purpose")?.includes("prefetch");
-  const isHomeVisit = request.method === "GET" && request.nextUrl.pathname === "/" && !isPrefetch;
+  // Next.js can strip its prefetch headers in proxy, so use the browser's
+  // fetch destination to distinguish document navigation from background requests.
+  const destination = request.headers.get("sec-fetch-dest");
+  const isHomeVisit = request.method === "GET" &&
+    request.nextUrl.pathname === "/" &&
+    (destination === "document" || destination === "iframe") &&
+    !request.headers.has("next-router-prefetch") &&
+    request.headers.get("purpose") !== "prefetch" &&
+    !request.headers.get("sec-purpose")?.includes("prefetch");
 
   // Refreshes an expired access token so the user stays signed in.
   try {

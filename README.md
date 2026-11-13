@@ -174,9 +174,10 @@ responses. Public opportunity listings remain available without signing in.
 
 Opening the GIVE home page (`/`), including logo navigation or returning through
 browser history, signs out the current browser session. The server clears auth
-cookies on actual home requests; link/browser prefetches never trigger sign-out.
-The client boundary covers cached navigation, hides account content during logout,
-and performs a full navigation to discard personalized router state.
+cookies on home document navigations; background requests, including Next.js
+prefetches, do not trigger sign-out. The client boundary covers client-side and
+cached navigation, hides account content during logout, and performs a full
+navigation to discard personalized router state.
 
 Signed-in users are also logged out after 30 minutes without pointer, keyboard,
 scroll, or touch activity. Activity is shared across tabs through local storage,
@@ -331,6 +332,10 @@ including the current recovery/login session. It checks the result before report
 success, invalidates the root layout's cached authenticated UI, and requires a new
 login. Normal sign-out also preserves the existing global scope explicitly and
 surfaces errors instead of claiming success.
+During reset submission, automatic session checks wait for the password update
+result so its intentional session revocation is not reported as a timeout.
+If the request fails, checks resume and the form reports that the outcome may
+be uncertain.
 
 Password-change success and session-revocation success are separate outcomes.
 If global sign-out fails, the password is already changed: the user sees an explicit

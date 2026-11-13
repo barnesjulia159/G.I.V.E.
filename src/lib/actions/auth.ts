@@ -202,16 +202,18 @@ export async function requestPasswordReset(formData: FormData) {
   redirect("/forgot-password?message=If an account exists for that email, a password reset link has been sent.");
 }
 
-export async function updatePassword(formData: FormData) {
+export async function updatePassword(formData: { get(name: string): unknown }): Promise<
+  { error: string; destination?: never } | { destination: string; error?: never }
+> {
   const password = String(formData.get("password") || "");
   const confirmPassword = String(formData.get("confirm_password") || "");
 
   if (password.trim().length < MIN_PASSWORD_LENGTH) {
-    redirect("/reset-password?error=Password must be at least 6 characters.");
+    return { error: "Password must be at least 6 characters." };
   }
 
   if (password !== confirmPassword) {
-    redirect("/reset-password?error=Passwords do not match.");
+    return { error: "Passwords do not match." };
   }
 
   const supabase = await createClient();
@@ -220,14 +222,14 @@ export async function updatePassword(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/forgot-password?error=Your reset link has expired. Please request a new one.");
+    return { destination: "/forgot-password?error=Your reset link has expired. Please request a new one." };
   }
 
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
     console.error("Password update failed", error);
-    redirect(`/reset-password?error=${encodeURIComponent(authErrorMessage(error))}`);
+    return { error: authErrorMessage(error) };
   }
 
   const { error: signOutError } = await supabase.auth.signOut({ scope: "global" });
@@ -235,10 +237,10 @@ export async function updatePassword(formData: FormData) {
 
   if (signOutError) {
     console.error("Global session invalidation failed after password update", signOutError);
-    redirect(`/login?error=${encodeURIComponent("Your password was updated, but we could not confirm sign-out on all devices. Sign in with your new password and try signing out again. Existing access tokens remain valid until they expire.")}`);
+    return { destination: `/login?error=${encodeURIComponent("Your password was updated, but we could not confirm sign-out on all devices. Sign in with your new password and try signing out again. Existing access tokens remain valid until they expire.")}` };
   }
 
-  redirect(`/login?message=${encodeURIComponent("Your password has been updated and all refresh sessions have been signed out. Please log in. Existing access tokens remain valid until they expire.")}`);
+  return { destination: `/login?message=${encodeURIComponent("Your password has been updated and all refresh sessions have been signed out. Please log in. Existing access tokens remain valid until they expire.")}` };
 }
 
 export async function signOut() {

@@ -24,6 +24,7 @@ export function AuthSessionBoundary({
     let disposed = false;
     let loggingOut = false;
     let failedLogout = false;
+    let passwordResetPending = false;
     let idleTimer: number | undefined;
     const idleTimeout = 30 * 60 * 1000;
     const activityKey = `give:last-activity:${userId}${sessionStartedAt ? `:${sessionStartedAt}` : ""}`;
@@ -87,7 +88,7 @@ export function AuthSessionBoundary({
     }
 
     function checkIdle() {
-      if (!userId || disposed || failedLogout) return false;
+      if (!userId || disposed || failedLogout || passwordResetPending) return false;
       readActivity();
       if (Date.now() - lastActivity >= idleTimeout) {
         void logout("/login?message=You%20were%20signed%20out%20after%2030%20minutes%20of%20inactivity.");
@@ -103,7 +104,7 @@ export function AuthSessionBoundary({
     }
 
     function reconcile(currentUserId: string | null) {
-      if (!disposed && !loggingOut && !failedLogout && currentUserId !== userId) {
+      if (!disposed && !loggingOut && !failedLogout && !passwordResetPending && currentUserId !== userId) {
         setBlocked(true);
         // A full reload discards personalized router history as well as component state.
         window.location.reload();
@@ -115,10 +116,10 @@ export function AuthSessionBoundary({
     });
 
     async function verifySession() {
-      if (disposed || loggingOut || failedLogout || checkIdle()) return;
+      if (disposed || loggingOut || failedLogout || passwordResetPending || checkIdle()) return;
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        if (disposed) return;
+        if (disposed || passwordResetPending) return;
         if (error && !user && userId) {
           if (error.status === 401 || error.status === 403 || error.name === "AuthSessionMissingError") {
             await logout("/login?message=Your%20session%20has%20ended.%20Please%20sign%20in%20again.");
@@ -132,7 +133,7 @@ export function AuthSessionBoundary({
         }
         reconcile(user?.id ?? null);
       } catch (error) {
-        if (disposed) return;
+        if (disposed || passwordResetPending) return;
         console.error("Session verification failed:", error);
         if (userId) {
           setBlocked(true);
@@ -151,6 +152,11 @@ export function AuthSessionBoundary({
     const onStorage = (event: StorageEvent) => {
       if (event.key === activityKey) checkIdle();
     };
+    const onPasswordReset = (event: Event) => {
+      if (pathname !== "/reset-password" || !(event instanceof CustomEvent)) return;
+      passwordResetPending = event.detail === true;
+      if (!passwordResetPending) void verifySession();
+    };
     const activityEvents = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"] as const;
     if (userId) {
       readActivity();
@@ -164,6 +170,7 @@ export function AuthSessionBoundary({
     window.addEventListener("focus", verifySession);
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("storage", onStorage);
+    window.addEventListener("give:password-reset-pending", onPasswordReset);
     document.addEventListener("visibilitychange", onVisibilityChange);
     activityEvents.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
     const interval = window.setInterval(verifySession, 30_000);
@@ -174,6 +181,7 @@ export function AuthSessionBoundary({
       window.removeEventListener("focus", verifySession);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("give:password-reset-pending", onPasswordReset);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       activityEvents.forEach((event) => window.removeEventListener(event, recordActivity));
       window.clearInterval(interval);

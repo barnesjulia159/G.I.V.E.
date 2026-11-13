@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { updatePassword } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SubmitButton } from "@/components/SubmitButton";
+import { ResetPasswordForm } from "@/components/ResetPasswordForm";
 
 type ResetPasswordPageProps = {
   searchParams: Promise<{
@@ -46,23 +45,7 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
 
         {params.error && <p className="alert-error mt-4">{params.error}</p>}
 
-        <form action={updatePassword} className="auth-form">
-          <div className="form-field">
-            <label htmlFor="password" className="form-label">
-              New password
-            </label>
-            <input id="password" name="password" type="password" autoComplete="new-password" minLength={6} required className="form-input" />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="confirm_password" className="form-label">
-              Confirm new password
-            </label>
-            <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={6} required className="form-input" />
-          </div>
-
-          <SubmitButton className="auth-submit">Update password</SubmitButton>
-        </form>
+        <ResetPasswordForm />
 
         <p className="auth-footer">
           <Link href="/login">Back to log in</Link>
