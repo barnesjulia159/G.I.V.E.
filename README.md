@@ -47,18 +47,17 @@ is required; the page uses the existing public organization RLS policy and publi
 opportunity listing view. Profile saves and opportunity changes invalidate public
 organization pages; requests also read fresh data.
 
-## Local timezone display
+## Eastern timezone display
 
 Event cards/details, dashboards, booking dates, attendance, reports, notifications,
-and profile dates display in the viewer's browser/operating-system timezone after
-hydration, including timezone abbreviations on times. Server HTML initially uses
-UTC to keep hydration deterministic; browsers with JavaScript disabled retain UTC.
-Ranges crossing daylight-saving changes label both offsets.
+and profile dates display in Eastern time (`America/New_York`), including the
+appropriate EST or EDT abbreviation. Server and browser rendering use the same
+timezone, so displayed dates do not shift during hydration.
 
 Stored timestamps and the upcoming-opportunity cutoff remain absolute instants.
-Server-generated notification bodies and email timestamps stay explicitly labelled
-UTC because the recipient's browser timezone is not available to background work.
-This change does not alter event date entry or the date-search filter's UTC semantics.
+Server-generated notification bodies and email timestamps use the same Eastern
+timezone. Event date entry, stored timestamps, hour calculations, and the
+date-search filter's UTC semantics are unchanged.
 
 ## Public listing quality (BUG-006 through BUG-014)
 

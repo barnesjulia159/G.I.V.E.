@@ -1,11 +1,4 @@
-"use client";
-
-import { useSyncExternalStore } from "react";
-import { formatDate, formatDateTime, formatDateTimeRange } from "@/lib/date-format";
-
-const subscribe = () => () => {};
-const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-const serverTimeZone = () => "UTC";
+import { DISPLAY_TIME_ZONE, formatDate, formatDateTime, formatDateTimeRange } from "@/lib/date-format";
 
 export function LocalDateTime({
   value,
@@ -16,7 +9,6 @@ export function LocalDateTime({
   end?: Date | string;
   dateOnly?: boolean;
 }) {
-  const timeZone = useSyncExternalStore(subscribe, browserTimeZone, serverTimeZone);
-  if (end) return formatDateTimeRange(value, end, timeZone);
-  return dateOnly ? formatDate(value, timeZone) : formatDateTime(value, timeZone);
+  if (end) return formatDateTimeRange(value, end, DISPLAY_TIME_ZONE);
+  return dateOnly ? formatDate(value, DISPLAY_TIME_ZONE) : formatDateTime(value, DISPLAY_TIME_ZONE);
 }

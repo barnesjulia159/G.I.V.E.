@@ -1168,19 +1168,13 @@ test("public discovery excludes past and exactly-started events while retaining 
   assert.ok(!rendered.includes("started-event"));
 });
 
-test("local time display uses browser timezone and a deterministic UTC hydration fallback", async () => {
+test("time display consistently uses Eastern time", async () => {
   const format = await import("./date-format.ts");
-  let hydrated = false;
   const display = await loadServerModule("../components/LocalDateTime.tsx", {
-    react: { useSyncExternalStore: (_subscribe, getSnapshot, getServerSnapshot) => {
-      assert.equal(getServerSnapshot(), "UTC");
-      return hydrated ? "America/New_York" : getServerSnapshot();
-    } },
+    react: {},
     "@/lib/date-format": format,
   });
   const value = "2026-11-05T01:00:00Z";
-  assert.equal(display.LocalDateTime({ value }), "November 5, 2026, 1:00 AM UTC");
-  hydrated = true;
   assert.equal(display.LocalDateTime({ value }), "November 4, 2026, 8:00 PM EST");
   assert.equal(display.LocalDateTime({ value, dateOnly: true }), "November 4, 2026");
   assert.equal(display.LocalDateTime({ value, end: "2026-11-05T02:00:00Z" }),

@@ -1,4 +1,4 @@
-export const DISPLAY_TIME_ZONE = "UTC";
+export const DISPLAY_TIME_ZONE = "America/New_York";
 
 function formatters(timeZone: string) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
