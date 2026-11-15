@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Toast } from "@/components/Toast";
+import { easternTimeOccurrence, parseEasternDateTimeInput, toEasternDateTimeInput } from "@/lib/date-format";
 
 type ManualCheckoutControlProps = {
   bookingId: string;
@@ -10,21 +11,16 @@ type ManualCheckoutControlProps = {
   initialCheckOutAt: string | null;
 };
 
-function toLocalDateTimeValue(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 16);
-}
-
 export function ManualCheckoutControl({
   bookingId,
   initialCheckInAt,
   initialCheckOutAt,
 }: ManualCheckoutControlProps) {
   const router = useRouter();
-  const [checkInAt, setCheckInAt] = useState(toLocalDateTimeValue(initialCheckInAt));
-  const [checkOutAt, setCheckOutAt] = useState(toLocalDateTimeValue(initialCheckOutAt));
+  const [checkInAt, setCheckInAt] = useState(initialCheckInAt ? toEasternDateTimeInput(initialCheckInAt) : "");
+  const [checkOutAt, setCheckOutAt] = useState(initialCheckOutAt ? toEasternDateTimeInput(initialCheckOutAt) : "");
+  const [checkInOccurrence, setCheckInOccurrence] = useState<"first" | "second">(initialCheckInAt ? easternTimeOccurrence(initialCheckInAt) : "first");
+  const [checkOutOccurrence, setCheckOutOccurrence] = useState<"first" | "second">(initialCheckOutAt ? easternTimeOccurrence(initialCheckOutAt) : "first");
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
@@ -34,14 +30,22 @@ export function ManualCheckoutControl({
     setFeedback("");
     setError("");
 
+    const checkIn = parseEasternDateTimeInput(checkInAt, initialCheckInAt, checkInOccurrence);
+    const checkOut = parseEasternDateTimeInput(checkOutAt, initialCheckOutAt, checkOutOccurrence);
+    if (!checkIn || !checkOut) {
+      setError("Enter valid Eastern times. Times skipped by daylight saving are invalid.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/attendance/manual-checkout", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId,
-          checkInAt: new Date(checkInAt).toISOString(),
-          checkOutAt: new Date(checkOutAt).toISOString(),
+          checkInAt: checkIn.toISOString(),
+          checkOutAt: checkOut.toISOString(),
         }),
       });
       const result = await response.json().catch(() => null);
@@ -70,7 +74,7 @@ export function ManualCheckoutControl({
     <div className="mt-3 border-t border-slate-100 pt-3">
       {feedback && <Toast message={feedback} variant="success" onDismiss={() => setFeedback("")} />}
       {error && <Toast message={error} variant="error" onDismiss={() => setError("")} />}
-      <p className="mb-2 text-sm font-medium text-slate-700">Manually set session times</p>
+      <p className="mb-2 text-sm font-medium text-slate-700">Manually set session times (Eastern)</p>
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label htmlFor={`check-in-${bookingId}`} className="form-label text-xs">Check-in</label>
@@ -82,6 +86,11 @@ export function ManualCheckoutControl({
             className="form-input py-2 text-sm"
             required
           />
+          <label htmlFor={`check-in-occurrence-${bookingId}`} className="form-label text-xs">If the time repeats during the fall clock change</label>
+          <select id={`check-in-occurrence-${bookingId}`} value={checkInOccurrence} onChange={(event) => setCheckInOccurrence(event.target.value === "second" ? "second" : "first")} className="form-input py-2 text-sm">
+            <option value="first">First occurrence (EDT)</option>
+            <option value="second">Second occurrence (EST)</option>
+          </select>
         </div>
         <div>
           <label htmlFor={`check-out-${bookingId}`} className="form-label text-xs">Check-out</label>
@@ -93,6 +102,11 @@ export function ManualCheckoutControl({
             className="form-input py-2 text-sm"
             required
           />
+          <label htmlFor={`check-out-occurrence-${bookingId}`} className="form-label text-xs">If the time repeats during the fall clock change</label>
+          <select id={`check-out-occurrence-${bookingId}`} value={checkOutOccurrence} onChange={(event) => setCheckOutOccurrence(event.target.value === "second" ? "second" : "first")} className="form-input py-2 text-sm">
+            <option value="first">First occurrence (EDT)</option>
+            <option value="second">Second occurrence (EST)</option>
+          </select>
         </div>
         <button
           type="button"

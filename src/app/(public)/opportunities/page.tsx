@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OpportunityCard } from "@/components/OpportunityCard";
 import { createClient } from "@/lib/supabase/server";
 import { PublicOpportunityListing } from "@/lib/types";
+import { easternDayBounds } from "@/lib/date-format";
 
 type OpportunitiesPageProps = {
   searchParams: Promise<{
@@ -49,9 +50,7 @@ export default async function OpportunitiesPage({
       : Promise.resolve({ data: null, error: null }),
   ]);
   const filterError = skillsError || causesError || skillMatchError || causeMatchError;
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) &&
-    !Number.isNaN(Date.parse(`${date}T00:00:00Z`)) &&
-    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
+  const dayBounds = easternDayBounds(date);
 
   let query = supabase
     .from("public_opportunity_listings")
@@ -73,10 +72,8 @@ export default async function OpportunitiesPage({
     query = query.ilike("city", `%${city.replace(/\\/g, "\\\\").replace(/[%_]/g, "\\$&")}%`);
   }
 
-  if (validDate) {
-    const nextDay = new Date(`${date}T00:00:00Z`);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    query = query.lt("start_at", nextDay.toISOString()).gt("end_at", `${date}T00:00:00Z`);
+  if (dayBounds) {
+    query = query.lt("start_at", dayBounds.end.toISOString()).gt("end_at", dayBounds.start.toISOString());
   }
 
   const matchingSkills = [...new Set(skillMatches?.map((match) => match.opportunity_id) ?? [])];
@@ -91,7 +88,7 @@ export default async function OpportunitiesPage({
     (!causeIds.length || matchingCauses.length > 0);
   const invalidFilters =
     !validPage ? "Choose a valid page number between 1 and 100000." :
-    date && !validDate ? "Choose a valid date." :
+    date && !dayBounds ? "Choose a valid date." :
     selectedSkills.length !== skillIds.length || selectedCauses.length !== causeIds.length
       ? "One or more selected skills or causes are unavailable. Clear filters and choose current options." : null;
   const { data, error } = !filterError && hasMatches && !invalidFilters
@@ -156,7 +153,7 @@ export default async function OpportunitiesPage({
         </div>
 
         <div className="form-field">
-          <label htmlFor="date" className="form-label">Date</label>
+          <label htmlFor="date" className="form-label">Date (Eastern)</label>
           <input id="date" name="date" type="date" defaultValue={date} className="form-input" />
         </div>
 

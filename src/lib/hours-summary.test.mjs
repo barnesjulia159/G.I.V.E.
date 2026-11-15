@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { Script } from "node:vm";
 import ts from "typescript";
 import { groupHoursByOpportunity } from "./hours-summary.ts";
+import * as dateFormat from "./date-format.ts";
 
 test("distinct events with the same title retain separate hours rows", () => {
   const entries = [
@@ -37,6 +38,58 @@ test("pending attendance is labelled without contributing unconfirmed hours", ()
   ]);
   assert.deepEqual(groups, [{ id: "event", title: "Event", hours: 2, pendingApproval: true }]);
 });
+
+test("manual attendance saves Eastern inputs as instants and rejects skipped times", async () => {
+    const source = await readFile(new URL("../components/ManualCheckoutControl.tsx", import.meta.url), "utf8");
+    const { outputText } = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+    });
+
+    for (const scenario of [
+      { inputs: ["2026-07-05T10:00", "2026-07-05T11:00", "first", "first"], expected: ["2026-07-05T14:00:00.000Z", "2026-07-05T15:00:00.000Z"] },
+      { inputs: ["2026-11-01T01:15", "2026-11-01T01:45", "first", "second"], expected: ["2026-11-01T05:15:00.000Z", "2026-11-01T06:45:00.000Z"] },
+      { inputs: [], initial: ["2026-11-01T06:15:42.000Z", "2026-11-01T07:45:17.000Z"], expected: ["2026-11-01T06:15:42.000Z", "2026-11-01T07:45:17.000Z"] },
+      { inputs: ["2026-03-08T02:30", "2026-03-08T04:00", "first", "first"], expected: null },
+    ]) {
+      let stateIndex = 0;
+      let saved;
+      const updates = [];
+      const jsx = (type, props) => ({ type, props });
+      const imports = {
+        react: { useState: (initial) => [scenario.inputs[stateIndex++] ?? initial, (value) => updates.push(value)] },
+        "react/jsx-runtime": { jsx, jsxs: jsx },
+        "next/navigation": { useRouter: () => ({ refresh() {} }) },
+        "@/components/Toast": {},
+        "@/lib/date-format": dateFormat,
+      };
+      const exports = {};
+      new Script(`(function(require, exports) { ${outputText}\n})`).runInNewContext({
+        console, JSON,
+        fetch: async (_url, options) => {
+          saved = JSON.parse(options.body);
+          return { ok: true, json: async () => ({}) };
+        },
+        BroadcastChannel: class { postMessage() {} close() {} },
+      })((name) => {
+        assert.ok(Object.hasOwn(imports, name), `Unexpected dependency: ${name}`);
+        return imports[name];
+      }, exports);
+      const tree = exports.ManualCheckoutControl({ bookingId: "booking", initialCheckInAt: scenario.initial?.[0] ?? null, initialCheckOutAt: scenario.initial?.[1] ?? null });
+      function findButton(node) {
+        if (!node || typeof node !== "object") return null;
+        if (node.type === "button") return node;
+        const children = node.props?.children;
+        return (Array.isArray(children) ? children : [children]).map(findButton).find(Boolean);
+      }
+      await findButton(tree).props.onClick();
+      if (scenario.expected) {
+        assert.deepEqual([saved.checkInAt, saved.checkOutAt], scenario.expected);
+      } else {
+        assert.equal(saved, undefined);
+        assert.ok(updates.some((value) => typeof value === "string" && value.includes("skipped by daylight saving")));
+      }
+    }
+  });
 
 test("dashboard loads asynchronously and retains polling, broadcast, visibility refresh and cleanup", async () => {
   const source = await readFile(new URL("../components/VolunteerHoursDashboard.tsx", import.meta.url), "utf8");

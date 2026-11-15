@@ -1,5 +1,63 @@
 export const DISPLAY_TIME_ZONE = "America/New_York";
 
+const easternInputFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: DISPLAY_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+export function toEasternDateTimeInput(value: Date | string) {
+  const parts = easternInputFormatter.formatToParts(asDate(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
+export function parseEasternDateTimeInput(
+  value: string,
+  previousValue?: Date | string | null,
+  occurrence: "first" | "second" = "first",
+): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const wallTime = Date.parse(`${value}:00Z`);
+  if (!Number.isFinite(wallTime) || new Date(wallTime).toISOString().slice(0, 16) !== value) return null;
+
+  // Both offsets around a DST transition are considered, including the repeated fall hour.
+  const offsets = [-86400000, 86400000].map((delta) => {
+    const instant = wallTime + delta;
+    return Date.parse(`${toEasternDateTimeInput(new Date(instant))}:00Z`) - instant;
+  });
+  const matches = offsets
+    .map((offset) => new Date(wallTime - offset))
+    .filter((date) => toEasternDateTimeInput(date) === value)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const selected = occurrence === "second" ? matches[matches.length - 1] : matches[0];
+  if (!selected) return null;
+  if (previousValue) {
+    const previous = asDate(previousValue);
+    if (previous.getTime() >= selected.getTime() && previous.getTime() < selected.getTime() + 60_000) return previous;
+  }
+  return selected;
+}
+
+export function easternTimeOccurrence(value: Date | string): "first" | "second" {
+  const first = parseEasternDateTimeInput(toEasternDateTimeInput(value));
+  return first && asDate(value).getTime() >= first.getTime() + 60_000 ? "second" : "first";
+}
+
+export function easternDayBounds(value: string): { start: Date; end: Date } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const calendarDay = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(calendarDay.getTime()) || calendarDay.toISOString().slice(0, 10) !== value) return null;
+  calendarDay.setUTCDate(calendarDay.getUTCDate() + 1);
+  const start = parseEasternDateTimeInput(`${value}T00:00`);
+  const end = parseEasternDateTimeInput(`${calendarDay.toISOString().slice(0, 10)}T00:00`);
+  return start && end ? { start, end } : null;
+}
+
 function formatters(timeZone: string) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "long",

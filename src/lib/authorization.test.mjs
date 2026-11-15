@@ -9,10 +9,12 @@ import pg from "pg";
 import * as opportunityValidation from "./opportunity-validation.ts";
 import { MIN_PASSWORD_LENGTH, registrationInputError } from "./auth-validation.ts";
 import { buildEventReport, confirmedAttendanceHours } from "./event-report.ts";
+import * as dateFormat from "./date-format.ts";
 
 // Execute the actual server modules with isolated auth/database boundaries,
 // without starting Next.js or connecting unit tests to the application database.
 async function loadServerModule(path, imports) {
+  imports["@/lib/date-format"] = { ...dateFormat, ...imports["@/lib/date-format"] };
   imports["@/lib/auth-validation"] = { MIN_PASSWORD_LENGTH, registrationInputError };
   imports["@/lib/event-report"] = { confirmedAttendanceHours };
   imports["@/lib/opportunity-validation"] = {
@@ -111,15 +113,16 @@ test("registration handles duplicate lookup and provider duplicate responses wit
   }
 });
 
-test("published edits reject missing title and invalid schedules before tenant queries", async () => {
+test("published edits reject missing titles and invalid schedules before updates", async () => {
   for (const invalid of [
     { title: "" }, { start_at: "" }, { end_at: "" }, { start_at: "garbled" },
     { end_at: "2099-01-01T10:00" }, { end_at: "2099-01-01T09:00" },
   ]) {
+    const supabase = opportunityClient({ previous: { id: objectId, start_at: "2099-01-01T15:00:00Z", end_at: "2099-01-01T16:00:00Z" } });
     const actions = await loadServerModule("./actions/opportunities.ts", {
       "next/navigation": navigation, "next/cache": {},
       "@/lib/authorization": { requireNonprofitOrganization: async () => ({
-        supabase: { from: () => assert.fail("Invalid publication must not access database") },
+        supabase,
         user: { id: userId }, organization: { id: "org-a" },
       }) },
       "@/lib/prisma": { prisma: {} }, "@/lib/date-format": {},
@@ -133,7 +136,8 @@ test("published edits reject missing title and invalid schedules before tenant q
       location_name: "Community Center", capacity: "10", ...invalid,
     })) form.set(key, value);
     await assert.rejects(actions.updateOpportunity(form), (error) =>
-      decodeURIComponent(error.location ?? "").includes("require a title and valid start and end times"));
+      decodeURIComponent(error.location ?? "").includes(invalid.title === "" ? "require a title" : "valid Eastern start and end times"));
+    assert.ok(supabase.calls.every((call) => !call.update));
   }
 });
 
@@ -722,8 +726,8 @@ test("create and edit enforce the real description and location rules before pub
       for (const [key, value] of Object.entries({
         opportunity_id: objectId, submit_action: "publish", title: "Community event",
         description: "Volunteers help plant flowers and maintain the community garden.",
-        location_name: "Community Center", start_at: "2099-01-01T10:00:00Z",
-        end_at: "2099-01-01T12:00:00Z", capacity: "10", ...invalid,
+        location_name: "Community Center", start_at: "2099-01-01T10:00",
+        end_at: "2099-01-01T12:00", capacity: "10", ...invalid,
       })) if (key !== "error") form.set(key, value);
       await assert.rejects(actions[actionName](form), (error) =>
         decodeURIComponent(error.location ?? "").includes(invalid.error));
@@ -759,11 +763,51 @@ test("valid physical and remote publications pass; drafts keep incomplete locati
     for (const [key, value] of Object.entries({
       opportunity_id: objectId, submit_action: "publish", title: "Event",
       description: "Volunteers help plant flowers and maintain the community garden.",
-      start_at: saved.start_at, end_at: saved.end_at, capacity: "10", ...fields,
+      start_at: dateFormat.toEasternDateTimeInput(saved.start_at), end_at: dateFormat.toEasternDateTimeInput(saved.end_at), capacity: "10", ...fields,
     })) form.set(key, value);
     await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
     assert.equal(supabase.calls.length, 2);
   }
+});
+
+test("event creation and editing persist Eastern inputs as instants and preserve repeated times", async () => {
+  let inserted;
+  const createQuery = {
+    insert(payload) { inserted = payload; return createQuery; },
+    select() { return createQuery; },
+    async single() { return { data: { id: objectId }, error: null }; },
+  };
+  const previous = {
+    id: objectId, title: "Event", status: "draft", start_at: "2026-11-01T06:30:42.000Z",
+    end_at: "2026-11-01T07:30:15.000Z", is_virtual: true,
+  };
+  const updateClient = opportunityClient({ previous, updated: previous });
+  let supabase = { from: () => createQuery };
+  const actions = await loadServerModule("./actions/opportunities.ts", {
+    "next/navigation": navigation, "next/cache": { revalidatePath: () => {} },
+    "@/lib/authorization": { requireNonprofitOrganization: async () => ({
+      supabase, user: { id: userId }, organization: { id: "org-a" },
+    }) },
+    "@/lib/prisma": { prisma: {} },
+    "@/lib/opportunity-validation": opportunityValidation,
+  });
+  const form = new FormData();
+  for (const [key, value] of Object.entries({
+    opportunity_id: objectId, submit_action: "draft", title: "Event", description: "Test",
+    start_at: "2026-11-01T01:30", end_at: "2026-11-01T02:30",
+    start_occurrence: "second", capacity: "10",
+  })) form.set(key, value);
+  await assert.rejects(actions.createOpportunity(form), (error) => error.location?.includes("Opportunity created"));
+  assert.equal(inserted.start_at, "2026-11-01T06:30:00.000Z");
+  assert.equal(inserted.end_at, "2026-11-01T07:30:00.000Z");
+  supabase = updateClient;
+  await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
+  const payload = updateClient.calls.find((call) => call.update).update;
+  assert.equal(payload.start_at, previous.start_at);
+  assert.equal(payload.end_at, previous.end_at);
+  form.set("start_at", "2026-03-08T02:30");
+  await assert.rejects(actions.updateOpportunity(form), (error) => decodeURIComponent(error.location ?? "").includes("skipped by daylight saving"));
+  assert.equal(updateClient.calls.filter((call) => call.update).length, 1);
 });
 
 test("changing between physical and virtual venues notifies booked volunteers", async () => {
@@ -789,6 +833,7 @@ test("changing between physical and virtual venues notifies booked volunteers", 
   for (const [key, value] of Object.entries({
     opportunity_id: objectId, submit_action: "publish", title: "Event", capacity: "10", is_virtual: "true",
     description: "Volunteers help plant flowers and maintain the community garden.",
+    start_at: "2099-01-01T05:00", end_at: "2099-01-01T07:00",
   })) form.set(key, value);
   await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
   assert.ok(notifications[0].message.includes("Location changed."));
@@ -822,6 +867,8 @@ test("foreign and zero-row opportunity updates never query participants or send 
     form.set("submit_action", "publish");
     form.set("title", "Event");
     form.set("capacity", "10");
+    form.set("start_at", "2099-01-01T10:00");
+    form.set("end_at", "2099-01-01T11:00");
     await assert.rejects(actions.updateOpportunity(form), (error) => error.location.includes("access denied"));
     assert.equal(privilegedCalls, 0);
     for (const call of supabase.calls) {
@@ -866,6 +913,8 @@ test("successful schedule notifications use persisted values and tenant-scoped p
   form.set("submit_action", "publish");
   form.set("title", "Unpersisted title");
   form.set("capacity", "10");
+  form.set("start_at", "2026-12-01T05:00");
+  form.set("end_at", "2026-12-01T06:00");
   await assert.rejects(actions.updateOpportunity(form), (error) => error.location.includes("Opportunity updated"));
   assert.equal(notifications.length, 1);
   assert.match(notifications[0].message, /Persisted title/);
@@ -920,6 +969,8 @@ test("capacity validation and database-rejected reductions never invalidate or s
     const form = new FormData();
     form.set("opportunity_id", objectId);
     form.set("capacity", capacity);
+    form.set("start_at", "2099-01-01T10:00");
+    form.set("end_at", "2099-01-01T11:00");
     await assert.rejects(actions.updateOpportunity(form), (error) =>
       error.location.includes(capacity === "1" ? "confirmed%20bookings" : "positive integer"));
     assert.deepEqual(invalidations, []);
@@ -1004,6 +1055,8 @@ test("publication transitions invalidate all affected views immediately after pe
     form.set("submit_action", action);
     form.set("title", "Event");
     form.set("capacity", "10");
+    form.set("start_at", "2099-01-01T10:00");
+    form.set("end_at", "2099-01-01T11:00");
     await assert.rejects(
       action === "archive" ? actions.archiveOpportunity(form) : actions.updateOpportunity(form),
       (error) => error.location?.includes(action === "archive" ? "Opportunity archived" : "Opportunity updated"),
@@ -1036,7 +1089,7 @@ test("newly published opportunities invalidate public caches even if notificatio
   const form = new FormData();
   for (const [key, value] of Object.entries({
     submit_action: "publish", title: "Event", description: "Description",
-    start_at: "2026-12-01T10:00:00Z", end_at: "2026-12-01T11:00:00Z", capacity: "10",
+    start_at: "2026-12-01T10:00", end_at: "2026-12-01T11:00", capacity: "10",
   })) form.set(key, value);
   const errors = [];
   const originalError = console.error;
@@ -1240,6 +1293,30 @@ test("organizer reservation and hours endpoints scope object queries before read
     assert.ok([403, 404].includes(response.status));
     assert.equal(objectLookups, 1);
   }
+});
+
+test("manual attendance API requires explicit timestamp offsets", async () => {
+  let saved;
+  const handler = await loadServerModule("../app/api/attendance/manual-checkout/route.ts", {
+    "next/server": nextServer,
+    "@/lib/supabase/server": { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: userId } } }) } }) },
+    "@/lib/prisma": { prisma: {
+      booking: { findFirst: async () => ({ id: objectId, status: "booked", opportunity: { organization: { user_id: userId } } }) },
+      attendanceLog: { upsert: async ({ create }) => { saved = create; return create; } },
+    } },
+    "@/lib/authorization": { getActiveProfile: async () => ({ id: userId, role: "nonprofit", isActive: true }) },
+    "@/lib/access-control": accessControl,
+  });
+  const request = (checkInAt, checkOutAt) => new Request("http://localhost/api/test", {
+    method: "PATCH", body: JSON.stringify({ bookingId: objectId, checkInAt, checkOutAt }),
+  });
+  const invalid = await handler.PATCH(request("2026-07-05T10:00", "2026-07-05T11:00"));
+  assert.equal(invalid.status, 400);
+  assert.equal(saved, undefined);
+  const valid = await handler.PATCH(request("2026-07-05T10:00:00-04:00", "2026-07-05T11:00:00-04:00"));
+  assert.equal(valid.status, 200);
+  assert.equal(saved.check_in_at.toISOString(), "2026-07-05T14:00:00.000Z");
+  assert.equal(saved.check_out_at.toISOString(), "2026-07-05T15:00:00.000Z");
 });
 
 test("self-service attendance reads and writes scope the reservation to the volunteer", async () => {

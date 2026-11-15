@@ -14,11 +14,14 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => null);
   const bookingId = typeof body?.bookingId === "string" ? body.bookingId : "";
-  const checkInAt = typeof body?.checkInAt === "string" ? new Date(body.checkInAt) : null;
-  const checkOutAt = typeof body?.checkOutAt === "string" ? new Date(body.checkOutAt) : null;
+  const explicitInstant = (value: unknown) =>
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+      ? new Date(value) : null;
+  const checkInAt = explicitInstant(body?.checkInAt);
+  const checkOutAt = explicitInstant(body?.checkOutAt);
 
   if (!bookingId || !checkInAt || !checkOutAt || Number.isNaN(checkInAt.getTime()) || Number.isNaN(checkOutAt.getTime())) {
-    return NextResponse.json({ message: "A booking, check-in time, and check-out time are required" }, { status: 400 });
+    return NextResponse.json({ message: "A booking and valid check-in and check-out times with timezone offsets are required" }, { status: 400 });
   }
 
   const duration = checkOutAt.getTime() - checkInAt.getTime();

@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { formatOpportunityLocation } from "./opportunity-validation.ts";
+import * as dateFormat from "./date-format.ts";
 
 const require = createRequire(import.meta.url);
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -293,6 +294,7 @@ test("opportunity mutations invalidate the organization route with the required 
       ...uiImports, "@/components/OpportunityCard": {
         OpportunityCard: ({ opportunity: row }) => createElement("article", { "data-event-id": row.id }, row.title),
       },
+      "@/lib/date-format": dateFormat,
       "@/lib/supabase/server": { createClient: async (options) => {
         assert.deepEqual(options, { noStore: true });
         return db;
@@ -317,6 +319,18 @@ test("opportunity mutations invalidate the organization route with the required 
     }
     const combined = await renderDirectory({ skill: "s1", cause: "c1", search: "Garden", city: "Town", date: "2099-01-01" });
     assert.deepEqual(combined.ids, ["a"]);
+  });
+
+  test("date filter matches event overlap with the Eastern calendar day", async () => {
+    const events = [
+      { ...opportunity, id: "before", start_at: "2098-12-31T23:00:00.000Z", end_at: "2099-01-01T05:00:00.000Z" },
+      { ...opportunity, id: "overlap", start_at: "2099-01-01T04:30:00.000Z", end_at: "2099-01-01T05:30:00.000Z" },
+      { ...opportunity, id: "late", start_at: "2099-01-02T04:30:00.000Z", end_at: "2099-01-02T05:30:00.000Z" },
+      { ...opportunity, id: "after", start_at: "2099-01-02T05:00:00.000Z", end_at: "2099-01-02T06:00:00.000Z" },
+    ];
+    const { ids, html } = await renderDirectory({ date: "2099-01-01" }, { events });
+    assert.deepEqual(ids, ["overlap", "late"]);
+    assert.ok(html.includes("Date (Eastern)"));
   });
 
   test("clear filters restores the unfiltered first page and resets form controls", async () => {

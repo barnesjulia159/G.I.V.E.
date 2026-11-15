@@ -12,7 +12,11 @@ import {
   formatOpportunityLocation,
   hasValidOpportunitySchedule,
 } from "@/lib/opportunity-validation";
-import { formatDate, formatDateTimeRange } from "@/lib/date-format";
+import { formatDate, formatDateTimeRange, parseEasternDateTimeInput } from "@/lib/date-format";
+
+function occurrence(formData: FormData, name: string) {
+  return formData.get(name) === "second" ? "second" : "first";
+}
 
 function getOpportunityPayload(formData: FormData, status: OpportunityStatus) {
   const startAt = String(formData.get("start_at") || "");
@@ -108,9 +112,13 @@ export async function createOpportunity(formData: FormData) {
     redirect(`/nonprofit/opportunities/new?error=${encodeURIComponent(`Published opportunities need a description of at least ${MIN_OPPORTUNITY_DESCRIPTION_LENGTH} characters.`)}`);
   }
 
-  if (!hasValidOpportunitySchedule(payload.start_at, payload.end_at)) {
-    redirect("/nonprofit/opportunities/new?error=Enter valid start and end times, with the end after the start.");
+  const startAt = parseEasternDateTimeInput(payload.start_at, null, occurrence(formData, "start_occurrence"));
+  const endAt = parseEasternDateTimeInput(payload.end_at, null, occurrence(formData, "end_occurrence"));
+  if (!startAt || !endAt || !hasValidOpportunitySchedule(startAt.toISOString(), endAt.toISOString())) {
+    redirect("/nonprofit/opportunities/new?error=Enter valid Eastern start and end times, with the end after the start. Times skipped by daylight saving are invalid.");
   }
+  payload.start_at = startAt.toISOString();
+  payload.end_at = endAt.toISOString();
 
   if (status === "published" && !hasValidOpportunityLocation({
     isVirtual: payload.is_virtual,
@@ -192,7 +200,7 @@ export async function updateOpportunity(formData: FormData) {
 
   const payload = getOpportunityPayload(formData, status);
 
-  if (status === "published" && (!payload.title || !hasValidOpportunitySchedule(payload.start_at, payload.end_at))) {
+  if (status === "published" && !payload.title) {
     redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent("Published opportunities require a title and valid start and end times, with the end after the start.")}`);
   }
 
@@ -224,6 +232,14 @@ export async function updateOpportunity(formData: FormData) {
   if (lookupError || !previousOpportunity) {
     redirect("/nonprofit/dashboard?error=Opportunity not found or access denied.");
   }
+
+  const startAt = parseEasternDateTimeInput(payload.start_at, previousOpportunity.start_at, occurrence(formData, "start_occurrence"));
+  const endAt = parseEasternDateTimeInput(payload.end_at, previousOpportunity.end_at, occurrence(formData, "end_occurrence"));
+  if (!startAt || !endAt || !hasValidOpportunitySchedule(startAt.toISOString(), endAt.toISOString())) {
+    redirect(`/nonprofit/opportunities/${opportunityId}/edit?error=${encodeURIComponent("Enter valid Eastern start and end times, with the end after the start. Times skipped by daylight saving are invalid.")}`);
+  }
+  payload.start_at = startAt.toISOString();
+  payload.end_at = endAt.toISOString();
 
   const { data: updatedOpportunity, error } = await supabase
     .from("opportunities")

@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { updateOpportunity } from "@/lib/actions/opportunities";
 import { requireNonprofitOrganization } from "@/lib/authorization";
 import { Opportunity } from "@/lib/types";
+import { easternTimeOccurrence, toEasternDateTimeInput } from "@/lib/date-format";
 
 type EditOpportunityPageProps = {
   params: Promise<{
@@ -118,7 +119,7 @@ async function EditOpportunityContent({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="form-field">
             <label htmlFor="start_at" className="form-label">
-              Start Date and Time
+              Start Date and Time (Eastern)
             </label>
             <input
               id="start_at"
@@ -126,14 +127,19 @@ async function EditOpportunityContent({
               type="datetime-local"
               step="60"
               required
-              defaultValue={toDateTimeLocal(opportunity.start_at)}
+              defaultValue={toEasternDateTimeInput(opportunity.start_at)}
               className="form-input"
             />
+            <label htmlFor="start_occurrence" className="form-label text-xs">If this time repeats during the fall clock change</label>
+            <select id="start_occurrence" name="start_occurrence" defaultValue={easternTimeOccurrence(opportunity.start_at)} className="form-input">
+              <option value="first">First occurrence (EDT)</option>
+              <option value="second">Second occurrence (EST)</option>
+            </select>
           </div>
 
           <div className="form-field">
             <label htmlFor="end_at" className="form-label">
-              End Date and Time
+              End Date and Time (Eastern)
             </label>
             <input
               id="end_at"
@@ -141,9 +147,14 @@ async function EditOpportunityContent({
               type="datetime-local"
               step="60"
               required
-              defaultValue={toDateTimeLocal(opportunity.end_at)}
+              defaultValue={toEasternDateTimeInput(opportunity.end_at)}
               className="form-input"
             />
+            <label htmlFor="end_occurrence" className="form-label text-xs">If this time repeats during the fall clock change</label>
+            <select id="end_occurrence" name="end_occurrence" defaultValue={easternTimeOccurrence(opportunity.end_at)} className="form-input">
+              <option value="first">First occurrence (EDT)</option>
+              <option value="second">Second occurrence (EST)</option>
+            </select>
           </div>
         </div>
 
@@ -308,12 +319,4 @@ async function EditOpportunityContent({
       </form>
     </section>
   );
-}
-
-function toDateTimeLocal(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-
-  return localDate.toISOString().slice(0, 16);
 }

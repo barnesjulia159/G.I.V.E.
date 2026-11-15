@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatDateTime, formatDateTimeRange } from "./date-format.ts";
+import { easternDayBounds, easternTimeOccurrence, formatDateTime, formatDateTimeRange, parseEasternDateTimeInput, toEasternDateTimeInput } from "./date-format.ts";
 
 test("formats same-day event ranges in Eastern time by default", () => {
   assert.equal(
@@ -44,4 +44,38 @@ test("omits stored seconds and separates both ends of a same-day range", () => {
   assert.equal(formatDateTimeRange("2026-11-05T11:08:45Z", "2026-11-05T21:06:59Z"),
     "November 5, 2026, 6:08 AM - 4:06 PM EST");
   assert.equal(formatDateTime("2026-11-05T11:08:45Z"), "November 5, 2026, 6:08 AM EST");
+});
+
+test("Eastern inputs convert independently of the server timezone and round-trip saved instants", () => {
+  assert.equal(parseEasternDateTimeInput("2026-01-05T10:00").toISOString(), "2026-01-05T15:00:00.000Z");
+  assert.equal(parseEasternDateTimeInput("2026-07-05T10:00").toISOString(), "2026-07-05T14:00:00.000Z");
+  assert.equal(toEasternDateTimeInput("2026-07-05T14:00:37.000Z"), "2026-07-05T10:00");
+  assert.equal(parseEasternDateTimeInput("2026-07-05T10:00", "2026-07-05T14:00:37.000Z").toISOString(), "2026-07-05T14:00:37.000Z");
+  for (const invalid of ["2026-02-30T10:00", "2026-01-05T25:00", "2026-03-08T02:30", "2026-01-05T10:00Z"]) {
+    assert.equal(parseEasternDateTimeInput(invalid), null, invalid);
+  }
+});
+
+test("fall repeated times support both occurrences and preserve saved instants", () => {
+  const first = "2026-11-01T05:30:00.000Z";
+  const second = "2026-11-01T06:30:42.000Z";
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:30").toISOString(), first);
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", null, "second").toISOString(), "2026-11-01T06:30:00.000Z");
+  assert.equal(easternTimeOccurrence(first), "first");
+  assert.equal(easternTimeOccurrence(second), "second");
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", second, "second").toISOString(), second);
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", second, "first").toISOString(), first);
+});
+
+test("Eastern date filtering uses actual local day boundaries across DST", () => {
+  for (const [day, start, end] of [
+    ["2026-01-05", "2026-01-05T05:00:00.000Z", "2026-01-06T05:00:00.000Z"],
+    ["2026-03-08", "2026-03-08T05:00:00.000Z", "2026-03-09T04:00:00.000Z"],
+    ["2026-11-01", "2026-11-01T04:00:00.000Z", "2026-11-02T05:00:00.000Z"],
+  ]) {
+    const bounds = easternDayBounds(day);
+    assert.equal(bounds.start.toISOString(), start);
+    assert.equal(bounds.end.toISOString(), end);
+  }
+  assert.equal(easternDayBounds("2026-02-30"), null);
 });

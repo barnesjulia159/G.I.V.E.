@@ -56,13 +56,15 @@ timezone, so displayed dates do not shift during hydration.
 
 Stored timestamps and the upcoming-opportunity cutoff remain absolute instants.
 Server-generated notification bodies and email timestamps use the same Eastern
-timezone. Event date entry, stored timestamps, hour calculations, and the
-date-search filter's UTC semantics are unchanged.
+timezone. Event and manual attendance inputs are interpreted as Eastern time, as
+is the date-search filter. Times skipped by the spring clock change are rejected;
+repeated times during the fall clock change can be set to their first or second
+occurrence. Unchanged existing timestamps are preserved. Stored timestamps and hour
+calculations remain based on absolute instants.
 
 ## Public listing quality (BUG-006 through BUG-014)
 
-- Event times omit seconds, use a spaced range separator, and label the viewer's
-  timezone (UTC in server HTML and server-generated notifications).
+- Event times omit seconds, use a spaced range separator, and label Eastern time.
 - Capacity wording uses "1 spot" and "0/2+ spots"; public cards and details share
   location formatting, including virtual events. Legacy missing locations say
   "Location not provided. Contact the organization for details."
