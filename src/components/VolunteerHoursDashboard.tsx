@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { Toast } from "@/components/Toast";
 
 import { groupHoursByOpportunity } from "@/lib/hours-summary";
 
@@ -37,6 +38,7 @@ export function VolunteerHoursDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeBookings, setActiveBookings] = useState<ActiveBooking[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [actionError, setActionError] = useState("");
 
   const fetchHours = useCallback(() => {
     return fetch("/api/attendance/hours", { cache: "no-store" }).then(async (response) => {
@@ -64,25 +66,30 @@ export function VolunteerHoursDashboard() {
 
   const handleCheckOut = async (bookingId: string) => {
     setActionLoading((prev) => ({ ...prev, [bookingId]: true }));
+    setActionError("");
     try {
       const response = await fetch("/api/attendance/check-out", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId }),
       });
-      if (response.ok) {
-        await fetchHours();
-        // Broadcast update to other pages/tabs
-        try {
-          const channel = new BroadcastChannel("attendance-updates");
-          channel.postMessage({ type: "attendance-update", action: "check-out", bookingId });
-          channel.close();
-        } catch {
-          console.warn("BroadcastChannel not supported");
-        }
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        setActionError(result?.message ?? "Unable to check out.");
+        return;
+      }
+      await fetchHours();
+      // Broadcast update to other pages/tabs
+      try {
+        const channel = new BroadcastChannel("attendance-updates");
+        channel.postMessage({ type: "attendance-update", action: "check-out", bookingId });
+        channel.close();
+      } catch {
+        console.warn("BroadcastChannel not supported");
       }
     } catch (error) {
       console.error("Check-out failed:", error);
+      setActionError("Unable to check out. Please try again.");
     } finally {
       setActionLoading((prev) => ({ ...prev, [bookingId]: false }));
     }
@@ -130,6 +137,7 @@ export function VolunteerHoursDashboard() {
 
   return (
     <div className="mt-6 space-y-6">
+      {actionError && <Toast message={actionError} variant="error" onDismiss={() => setActionError("")} />}
       {/* Header with refresh button and last updated */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4 shadow-sm">
         <div className="text-sm text-slate-600">

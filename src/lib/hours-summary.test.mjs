@@ -121,6 +121,7 @@ test("dashboard loads asynchronously and retains polling, broadcast, visibility 
     },
     "react/jsx-runtime": { jsx: () => null, jsxs: () => null },
     "@/components/LocalDateTime": {},
+    "@/components/Toast": {},
     "@/lib/hours-summary": { groupHoursByOpportunity },
   };
   const exports = {};
@@ -173,4 +174,43 @@ test("dashboard loads asynchronously and retains polling, broadcast, visibility 
   assert.equal(intervalCleared, true);
   assert.equal(listenerRemoved, true);
   assert.equal(channel.closed, true);
+});
+
+test("hours dashboard shows the checkout rejection for early sessions", async () => {
+  const source = await readFile(new URL("../components/VolunteerHoursDashboard.tsx", import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  });
+  let stateIndex = 0;
+  const updates = [];
+  const jsx = (type, props) => ({ type, props });
+  const imports = {
+    react: {
+      useState: (initial) => [stateIndex++ === 4 ? [{ id: "booking", opportunityTitle: "Event", checkInAt: "2026-11-15T16:50:00Z", checkOutAt: null }] : initial, (value) => updates.push(value)],
+      useCallback: (callback) => callback,
+      useEffect: () => {},
+    },
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "@/components/LocalDateTime": {},
+    "@/components/Toast": {},
+    "@/lib/hours-summary": { groupHoursByOpportunity },
+  };
+  const exports = {};
+  new Script(`(function(require, exports) { ${outputText}\n})`).runInNewContext({
+    console,
+    fetch: async () => ({ ok: false, json: async () => ({ message: "Check-out is available once the event starts." }) }),
+  })((name) => {
+    assert.ok(Object.hasOwn(imports, name), `Unexpected dependency: ${name}`);
+    return imports[name];
+  }, exports);
+  const tree = exports.VolunteerHoursDashboard();
+  function findCheckout(node) {
+    if (!node || typeof node !== "object") return null;
+    if (Array.isArray(node)) return node.map(findCheckout).find(Boolean);
+    if (node.type === "button" && node.props.children === "Check out") return node;
+    const children = node.props?.children;
+    return (Array.isArray(children) ? children : [children]).map(findCheckout).find(Boolean);
+  }
+  await findCheckout(tree).props.onClick();
+  assert.ok(updates.includes("Check-out is available once the event starts."));
 });

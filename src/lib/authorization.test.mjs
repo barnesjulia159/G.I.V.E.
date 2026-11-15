@@ -10,11 +10,13 @@ import * as opportunityValidation from "./opportunity-validation.ts";
 import { MIN_PASSWORD_LENGTH, registrationInputError } from "./auth-validation.ts";
 import { buildEventReport, confirmedAttendanceHours } from "./event-report.ts";
 import * as dateFormat from "./date-format.ts";
+import * as attendance from "./attendance.ts";
 
 // Execute the actual server modules with isolated auth/database boundaries,
 // without starting Next.js or connecting unit tests to the application database.
 async function loadServerModule(path, imports) {
   imports["@/lib/date-format"] = { ...dateFormat, ...imports["@/lib/date-format"] };
+  imports["@/lib/attendance"] = attendance;
   imports["@/lib/auth-validation"] = { MIN_PASSWORD_LENGTH, registrationInputError };
   imports["@/lib/event-report"] = { confirmedAttendanceHours };
   imports["@/lib/opportunity-validation"] = {
@@ -1362,12 +1364,16 @@ async function attendanceHandler(path, prisma, role = "volunteer") {
       method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" },
     });
 
-    test("self check-in rejects times outside the event and never creates confirmed hours", async () => {
-      const now = Date.now();
-      for (const [start, end, expected] of [
-        [now + 3600000, now + 7200000, 409],
-        [now - 7200000, now - 3600000, 409],
-        [now - 3600000, now + 3600000, 201],
+    test("self check-in opens exactly 15 minutes before the event and never confirms hours", async (t) => {
+      const now = Date.parse("2026-11-15T17:00:00Z");
+      t.mock.timers.enable({ apis: ["Date"], now });
+      for (const [start, end, expected, existing] of [
+        [now + 15 * 60000 + 1, now + 7200000, 409, false],
+        [now + 15 * 60000, now + 7200000, 201, false],
+        [now + 5 * 60000, now + 7200000, 201, true],
+        [now, now + 3600000, 201, false],
+        [now - 7200000, now, 409, false],
+        [now - 7200000, now - 3600000, 409, false],
       ]) {
         let writes = 0;
         const handler = await attendanceHandler("../app/api/attendance/check-in/route.ts", {
@@ -1380,12 +1386,20 @@ async function attendanceHandler(path, prisma, role = "volunteer") {
             };
           } },
           attendanceLog: {
-            findUnique: async () => null,
+            findUnique: async () => existing ? { id: "attendance", check_in_at: null, check_out_at: null, verified_at: null } : null,
             create: async ({ data }) => {
               writes++;
               assert.equal(data.verified_at ?? null, null);
               assert.equal(data.verified_by ?? null, null);
+              assert.equal(data.check_in_at.getTime(), now);
               return { ...data, id: "attendance", verified_at: null, verified_by: null };
+            },
+            updateManyAndReturn: async ({ data }) => {
+              writes++;
+              assert.equal(data.check_in_at.getTime(), now);
+              assert.equal(data.verified_at, null);
+              assert.equal(data.verified_by, null);
+              return [{ ...data, id: "attendance" }];
             },
           },
         });
@@ -1393,6 +1407,44 @@ async function attendanceHandler(path, prisma, role = "volunteer") {
         assert.equal(response.status, expected);
         assert.equal(writes, expected === 201 ? 1 : 0);
       }
+    });
+
+    test("early check-in can check out only after event start and still earns actual attendance time", async (t) => {
+      const start = Date.parse("2026-11-15T17:00:00Z");
+      t.mock.timers.enable({ apis: ["Date"], now: start - 1 });
+      const session = {
+        id: "attendance", check_in_at: new Date(start - 15 * 60000), check_out_at: null, verified_at: null,
+        booking: {
+          volunteer_id: userId, status: "booked",
+          opportunity: { start_at: new Date(start), end_at: new Date(start + 3600000), is_deleted: false },
+        },
+      };
+      let updated;
+      const handler = await attendanceHandler("../app/api/attendance/check-out/route.ts", {
+        attendanceLog: {
+          findFirst: async () => session,
+          updateManyAndReturn: async ({ where, data }) => {
+            assert.equal(where.check_in_at, session.check_in_at);
+            assert.equal(where.verified_at, null);
+            updated = { ...session, ...data };
+            return [updated];
+          },
+        },
+      });
+      const early = await handler.POST(attendanceRequest({ bookingId: objectId }));
+      assert.equal(early.status, 409);
+      assert.match((await early.json()).message, /once the event starts/);
+      assert.equal(updated, undefined);
+      t.mock.timers.tick(1);
+      const onTime = await handler.POST(attendanceRequest({ bookingId: objectId }));
+      assert.equal(onTime.status, 200);
+      assert.equal(updated.check_out_at.getTime(), start);
+      assert.equal(confirmedAttendanceHours({ ...updated, verified_at: new Date(start), verified_by: "organizer" }), 0.25);
+      session.check_in_at = new Date(start - 15 * 60000 - 1);
+      updated = undefined;
+      const outsideWindow = await handler.POST(attendanceRequest({ bookingId: objectId }));
+      assert.equal(outsideWindow.status, 409);
+      assert.equal(updated, undefined);
     });
 
     test("self checkout is bounded by event end and cannot race past organizer confirmation", async () => {

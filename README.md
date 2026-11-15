@@ -113,8 +113,10 @@ test database variables are configured; never point them at the application DB.
 
 QA-011/security follow-up: after approval of the security fix, attendance-derived
 hours require explicit organizer confirmation of a completed present session.
-Volunteers may check in only during the published event; checkout is capped at
-the event end. Conditional writes prevent volunteer timestamp changes from
+Volunteers may check in from 15 minutes before a published event until it ends.
+Checkout is available once the event starts and is capped at the event end;
+confirmed hours count from the actual check-in, including any early arrival.
+Conditional writes prevent volunteer timestamp changes from
 overwriting a confirmed session, and approval rejects concurrent timestamp changes.
 The hours API, event reports, and participant totals share the same confirmed-hours
 calculation. Authorized manual hours and overrides (including zero) retain their
@@ -130,8 +132,8 @@ deploying the approval code, then run `npm run prisma:generate`. The migration
 does not auto-confirm historical records: organizers must review completed sessions
 and save Present to confirm them, or correct times using the manual checkout control.
 It also removes direct end-user attendance mutation privileges; writes go through
-the authenticated, tenant-authorized server handlers. This migration has not been
-applied to the connected application database in this QA pass.
+the authenticated, tenant-authorized server handlers. Check migration status on
+each application database before deploying the attendance code.
 
 QA-012 remains unresolved:
 booking commits and in-app notification writes are separate operations, so a

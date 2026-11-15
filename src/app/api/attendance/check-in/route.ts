@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveProfile } from "@/lib/authorization";
 import { isActiveRole } from "@/lib/access-control";
+import { SELF_CHECK_IN_EARLY_MS } from "@/lib/attendance";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -70,8 +71,8 @@ export async function POST(request: Request) {
 
   const now = new Date();
   if (booking.opportunity.is_deleted || booking.opportunity.status !== "published" ||
-    now < booking.opportunity.start_at || now >= booking.opportunity.end_at) {
-    return NextResponse.json({ message: "Self check-in is available only during the published event. Contact the organizer for corrections." }, { status: 409 });
+    now.getTime() < booking.opportunity.start_at.getTime() - SELF_CHECK_IN_EARLY_MS || now >= booking.opportunity.end_at) {
+    return NextResponse.json({ message: "Self check-in is available from 15 minutes before the published event starts until it ends. Contact the organizer for corrections." }, { status: 409 });
   }
   const existing = await prisma.attendanceLog.findUnique({
     where: { booking_id: booking.id },

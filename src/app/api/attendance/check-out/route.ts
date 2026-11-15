@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveProfile } from "@/lib/authorization";
 import { isActiveRole } from "@/lib/access-control";
+import { SELF_CHECK_IN_EARLY_MS } from "@/lib/attendance";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -55,8 +56,11 @@ export async function POST(request: Request) {
   }
   const now = new Date();
   const opportunity = attendance.booking.opportunity;
+  if (now < opportunity.start_at) {
+    return NextResponse.json({ message: "Check-out is available once the event starts." }, { status: 409 });
+  }
   const checkOutAt = new Date(Math.min(now.getTime(), opportunity.end_at.getTime()));
-  if (attendance.check_in_at < opportunity.start_at || checkOutAt <= attendance.check_in_at) {
+  if (attendance.check_in_at.getTime() < opportunity.start_at.getTime() - SELF_CHECK_IN_EARLY_MS || checkOutAt <= attendance.check_in_at) {
     return NextResponse.json({ message: "Session times must fall within the event. Contact the organizer for corrections." }, { status: 409 });
   }
   const [updated] = await prisma.attendanceLog.updateManyAndReturn({
