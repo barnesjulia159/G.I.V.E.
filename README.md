@@ -103,6 +103,8 @@ changing filters starts at page one. Clear filters resets the uncontrolled form
 when returning to the unfiltered route. Invalid dates, obsolete option IDs, and
 invalid page numbers produce explicit feedback. Keyword punctuation is quoted
 as a single PostgREST pattern, with literal wildcard characters escaped.
+City filtering also searches the public location text when the saved city is
+blank or missing, so address-only opportunities can still be found by city.
 
 Regression coverage includes all combinations of the test fixture's skill/cause
 options, combined keyword/city/date filters, clearing, pagination with a synthetic

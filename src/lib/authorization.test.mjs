@@ -6,6 +6,7 @@ import ts from "typescript";
 import * as accessControl from "./access-control.ts";
 import { isTrustedRequest } from "./request-security.ts";
 import pg from "pg";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as opportunityValidation from "./opportunity-validation.ts";
 import { MIN_PASSWORD_LENGTH, registrationInputError } from "./auth-validation.ts";
 import { buildEventReport, confirmedAttendanceHours } from "./event-report.ts";
@@ -1184,6 +1185,35 @@ test("public listing and detail read the live visibility view without caching fo
     const request = detail.default({ params: Promise.resolve({ id: objectId }), searchParams: Promise.resolve({}) });
     if (visible) await request;
     else await assert.rejects(request, /not found/);
+  }
+});
+
+test("city filtering falls back to public location only for missing cities and combines with keyword search", async () => {
+  const requests = [];
+  const supabase = createSupabaseClient("https://example.supabase.co", "test-key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async (input) => {
+      requests.push(new URL(input));
+      return Response.json([]);
+    } },
+  });
+  const jsx = (type, props) => ({ type: typeof type === "string" ? type : "component", props });
+  const listing = await loadServerModule("../app/(public)/opportunities/page.tsx", {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "next/link": {},
+    "@/components/OpportunityCard": {},
+    "@/lib/supabase/server": { createClient: async () => supabase },
+  });
+  for (const [city, pattern] of [
+    ["wilmington", '"%wilmington%"'],
+    ['A,B_%\\"', JSON.stringify('%A,B\\_\\%\\\\"%')],
+  ]) {
+    await listing.default({ searchParams: Promise.resolve({ city, search: "Helping Hands" }) });
+    const url = requests.findLast((request) => request.pathname.endsWith("/public_opportunity_listings"));
+    assert.deepEqual(url.searchParams.getAll("or"), [
+      '(title.ilike."%Helping Hands%",description.ilike."%Helping Hands%",organization_name.ilike."%Helping Hands%")',
+      `(city.ilike.${pattern},and(or(city.is.null,city.eq.""),location_name.ilike.${pattern}))`,
+    ]);
   }
 });
 

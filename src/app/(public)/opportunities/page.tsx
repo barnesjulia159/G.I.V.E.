@@ -69,7 +69,10 @@ export default async function OpportunitiesPage({
   }
 
   if (city) {
-    query = query.ilike("city", `%${city.replace(/\\/g, "\\\\").replace(/[%_]/g, "\\$&")}%`);
+    const pattern = JSON.stringify(`%${city.replace(/\\/g, "\\\\").replace(/[%_]/g, "\\$&")}%`);
+    query = query.or(
+      `city.ilike.${pattern},and(or(city.is.null,city.eq.""),location_name.ilike.${pattern})`
+    );
   }
 
   if (dayBounds) {
