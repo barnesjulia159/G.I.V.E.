@@ -19,7 +19,7 @@ export function toEasternDateTimeInput(value: Date | string) {
 export function parseEasternDateTimeInput(
   value: string,
   previousValue?: Date | string | null,
-  occurrence: "first" | "second" = "first",
+  occurrence?: "first" | "second",
 ): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
   const wallTime = Date.parse(`${value}:00Z`);
@@ -34,6 +34,10 @@ export function parseEasternDateTimeInput(
     .map((offset) => new Date(wallTime - offset))
     .filter((date) => toEasternDateTimeInput(date) === value)
     .sort((a, b) => a.getTime() - b.getTime());
+  if (previousValue && !occurrence) {
+    const previous = asDate(previousValue);
+    if (matches.some((match) => previous.getTime() >= match.getTime() && previous.getTime() < match.getTime() + 60_000)) return previous;
+  }
   const selected = occurrence === "second" ? matches[matches.length - 1] : matches[0];
   if (!selected) return null;
   if (previousValue) {

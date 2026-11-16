@@ -796,12 +796,15 @@ test("event creation and editing persist Eastern inputs as instants and preserve
   const form = new FormData();
   for (const [key, value] of Object.entries({
     opportunity_id: objectId, submit_action: "draft", title: "Event", description: "Test",
-    start_at: "2026-11-01T01:30", end_at: "2026-11-01T02:30",
-    start_occurrence: "second", capacity: "10",
+    start_at: "2026-11-01T01:30", end_at: "2026-11-01T02:30", capacity: "10",
   })) form.set(key, value);
+  await assert.rejects(actions.createOpportunity(form), (error) => error.location?.includes("Opportunity created"));
+  assert.equal(inserted.start_at, "2026-11-01T05:30:00.000Z");
+  form.set("start_occurrence", "second");
   await assert.rejects(actions.createOpportunity(form), (error) => error.location?.includes("Opportunity created"));
   assert.equal(inserted.start_at, "2026-11-01T06:30:00.000Z");
   assert.equal(inserted.end_at, "2026-11-01T07:30:00.000Z");
+  form.delete("start_occurrence");
   supabase = updateClient;
   await assert.rejects(actions.updateOpportunity(form), (error) => error.location?.includes("Opportunity updated"));
   const payload = updateClient.calls.find((call) => call.update).update;

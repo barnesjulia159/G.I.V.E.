@@ -15,7 +15,8 @@ import {
 import { formatDate, formatDateTimeRange, parseEasternDateTimeInput } from "@/lib/date-format";
 
 function occurrence(formData: FormData, name: string) {
-  return formData.get(name) === "second" ? "second" : "first";
+  const value = formData.get(name);
+  return value === "first" || value === "second" ? value : undefined;
 }
 
 function getOpportunityPayload(formData: FormData, status: OpportunityStatus) {

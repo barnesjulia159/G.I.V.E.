@@ -63,6 +63,8 @@ test("fall repeated times support both occurrences and preserve saved instants",
   assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", null, "second").toISOString(), "2026-11-01T06:30:00.000Z");
   assert.equal(easternTimeOccurrence(first), "first");
   assert.equal(easternTimeOccurrence(second), "second");
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", second).toISOString(), second);
+  assert.equal(parseEasternDateTimeInput("2026-11-01T01:31", second).toISOString(), "2026-11-01T05:31:00.000Z");
   assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", second, "second").toISOString(), second);
   assert.equal(parseEasternDateTimeInput("2026-11-01T01:30", second, "first").toISOString(), first);
 });

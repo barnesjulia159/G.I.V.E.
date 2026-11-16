@@ -58,8 +58,8 @@ Stored timestamps and the upcoming-opportunity cutoff remain absolute instants.
 Server-generated notification bodies and email timestamps use the same Eastern
 timezone. Event and manual attendance inputs are interpreted as Eastern time, as
 is the date-search filter. Times skipped by the spring clock change are rejected;
-repeated times during the fall clock change can be set to their first or second
-occurrence. Unchanged existing timestamps are preserved. Stored timestamps and hour
+newly entered repeated times during the fall clock change use the first occurrence
+(EDT). Unchanged existing timestamps, including second-occurrence times, are preserved. Stored timestamps and hour
 calculations remain based on absolute instants.
 
 ## Public listing quality (BUG-006 through BUG-014)

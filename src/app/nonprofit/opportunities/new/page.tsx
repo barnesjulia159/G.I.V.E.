@@ -80,11 +80,6 @@ async function OpportunityForm({
             required
             className="form-input"
           />
-          <label htmlFor="start_occurrence" className="form-label text-xs">If this time repeats during the fall clock change</label>
-          <select id="start_occurrence" name="start_occurrence" className="form-input">
-            <option value="first">First occurrence (EDT)</option>
-            <option value="second">Second occurrence (EST)</option>
-          </select>
         </div>
 
         <div className="form-field">
@@ -99,11 +94,6 @@ async function OpportunityForm({
             required
             className="form-input"
           />
-          <label htmlFor="end_occurrence" className="form-label text-xs">If this time repeats during the fall clock change</label>
-          <select id="end_occurrence" name="end_occurrence" className="form-input">
-            <option value="first">First occurrence (EDT)</option>
-            <option value="second">Second occurrence (EST)</option>
-          </select>
         </div>
       </div>
 
